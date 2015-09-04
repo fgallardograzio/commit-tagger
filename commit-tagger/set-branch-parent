@@ -1,0 +1,3 @@
+#!/bin/bash
+
+echo "set branch parent! $1 $2"

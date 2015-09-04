@@ -1,0 +1,47 @@
+#!/bin/bash
+
+function showHelp {
+  cat "commit-tagger/help"
+}
+
+case "$1" in
+  "set-parent")
+    # specify parent for the given branch
+    echo "set-parent"
+  ;;
+
+  "get-parent")
+    # get
+    "commit-tagger/get-branch-parent" "$2"
+  ;;
+
+  "remove-parent")
+    # remove
+    "commit-tagger/set-branch-parent" "$2" "--remove"
+  ;;
+
+  "ignore")
+    # ignore
+    "commit-tagger/set-branch-parent" "$2" "--ignore"
+  ;;
+
+  "test")
+    # test
+    "commit-tagger/test-branch" "$2"
+  ;;
+
+  "help")
+    # help
+    showHelp
+  ;;
+
+  "")
+    showHelp
+    exit 1
+  ;;
+
+  *)
+    echo -e "Invalid command: '$1'.\nPlease run 'git commit-tagger help' to see available commands" >&2
+    exit 1
+  ;;
+esac
