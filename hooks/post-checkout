@@ -1,0 +1,24 @@
+#!/bin/bash
+
+prevHEAD="$1"
+newHEAD="$2"
+checkoutType="$3"
+getParent="$(git rev-parse --git-dir)/get-branch-parent"
+setParent="$(git rev-parse --git-dir)/set-branch-parent"
+hookEnabled="$(git config --get commit-tagger.enabled || echo "true")"
+
+if [ "$hookEnabled" = "false" ]; then
+  exit 0
+elif [ "$hookEnabled" != "true" ]; then
+  echo -e "Invalid option found: commit-tagger.enabled=$hookEnabled. Allowed values are true (default) and false.\nPlease use 'git config commit-tagger.enabled true|false' to set a valid configuration."
+  exit 1
+fi
+
+if [ $checkoutType -eq 1 -a "$prevHEAD" = "$newHEAD" ]; then
+  previousBranch="$(git reflog -n 1 | sed "s|^.*moving from \([^ ]\+\) to \([^ ]\+\)$|\1|")"
+  currentBranch="$(git reflog -n 1 | sed "s|^.*moving from \([^ ]\+\) to \([^ ]\+\)$|\2|")"
+
+  if ! "$getParent" "$currentBranch" > /dev/null; then
+    "$setParent" "$currentBranch" "$previousBranch" 2> /dev/null
+  fi
+fi

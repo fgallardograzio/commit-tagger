@@ -1,0 +1,160 @@
+#!/bin/sh
+
+echo "hook!"
+
+message="$(cat $1)"
+branch="$(git rev-parse --abbrev-ref HEAD)"
+getParent="$(git rev-parse --git-dir)/get-branch-parent"
+mode="$(git config --get commit-tagger.mode || echo "opt-out")"
+confirm="$(git config --get commit-tagger.confirm || echo "true")"
+hookEnabled="$(git config --get commit-tagger.enabled || echo "true")"
+
+if [ "$hookEnabled" = "false" ]; then
+  exit 0
+elif [ "$hookEnabled" != "true" ]; then
+  echo -e "Invalid option found: commit-tagger.enabled=$hookEnabled. Allowed values are true (default) and false.\nPlease use 'git config commit-tagger.enabled true|false' to set a valid configuration."
+  exit 1
+fi
+
+echo "start..."
+
+parents="$(cat "$(git rev-parse --git-dir)/branch-parents")"
+
+function catgetParent {
+  catParent="$(echo "$parents" | sed -n "s|$1:||p" | head -1)"
+  if [ ! -z "$catParent" ]; then
+    echo "$catParent"
+  else
+    return 1
+  fi
+}
+
+getParent="catgetParent"
+
+function prompt {
+  case "$confirm" in
+    "true" )
+      formatMessage="$(echo "$message" | sed "s|^|  |")"
+      echo -e "The commit message will be the following:\n\n$formatMessage\n\n"
+       while true; do
+        echo -n -e "Do you wish to continue? [yes or no]: "
+
+        exec < /dev/tty
+        read promptRes
+        case "$promptRes" in
+          [yY] | [yY][eE][sS] )
+            return 0
+            ;;
+
+          [nN] | [nN][oO] )
+            return 1
+            ;;
+        esac
+       done
+      ;;
+
+    "false" )
+      return 0
+      ;;
+
+    * )
+      echo -e "Invalid option found: commit-tagger.confirm=$confirm. Allowed values are true (default) and false.\nPlease use 'git config commit-tagger.confirm true|false' to set a valid configuration."
+      exit 1
+      ;;
+  esac
+}
+
+function getTag {
+  echo "$(echo $1 | sed "s|.*\/||")"
+}
+
+function tagMessage {
+  parentBranch="$("$getParent" "$branch")"
+  parentExists=$?
+  if [ "$parentExists" -eq 0 ]; then
+    if [ "$parentBranch" != "--ignore" ]; then
+      message="$(echo "$message" | sed "1 s|^\([^\[].*\)$| \1|")"
+      message="[$(getTag "$branch")]$message"
+
+      counter=20
+      while [ "$parentExists" -eq 0 -a "$parentBranch" != "--ignore" ]; do
+        message="[$(getTag "$parentBranch")]$message"
+        parentBranch="$("$getParent" "$parentBranch")"
+        parentExists=$?
+        echo "$parentBranch"
+        counter=$(($counter - 1))
+        if [ $counter -lt 0 ]; then
+          echo -e "Sorry, there seems to be an error in the branch hierarchy causing an infinite loop."
+          exit 1
+        fi
+      done
+    fi
+  else
+    message="$(echo "$message" | sed "1 s|^\([^\[].*\)$| \1|")"
+    message="[$(getTag "$branch")]$message"
+  fi
+}
+
+echo "end of functions"
+
+case "$mode" in
+  "opt-in" )
+    if echo "$message" | head -1 | grep -q "^+"; then
+      message="$(echo "$message" | sed "1 s|^+||")"
+      tagMessage
+    fi
+  ;;
+
+  "opt-out" )
+    if echo "$message" | head -1 | grep -q -v "^-"; then
+      echo "tag"
+      tagMessage
+      echo "tagged"
+    else
+      message="$(echo "$message" | sed "1 s|^-||")"
+    fi
+  ;;
+
+  * )
+    echo -e "Invalid option found: commit-tagger.mode=$mode. Allowed values are opt-in and opt-out (default).\nPlease use 'git config commit-tagger.mode opt-in|opt-out' to set a valid configuration."
+    exit 1
+  ;;
+esac
+
+if [ "$2" != "message" ] || prompt; then
+  echo "$message" > $1
+else
+  echo -e "The commit has been aborted."
+  exit 1
+fi
+
+
+# if ! echo "$message" | grep -q "^-"; then
+#   # message="$(echo "$message" | sed "s|^+\(+*\)\[|\1\[|" | sed "s|^\([^\[].*\)$| \1|")"
+
+#   if "$getParent" "$branch" > /dev/null; then
+#     if [ "$("$getParent" "$branch")" != "--ignore" ]; then
+#       message="$(echo "$message" | sed "1 s|^\([^\[].*\)$| \1|")"
+#       message="[$(getTag "$branch")]$message"
+
+#       counter=20
+#       while "$getParent" "$branch" > /dev/null && [ "$("$getParent" "$branch")" != "--ignore" ]; do
+#         message="[$(getTag "$("$getParent" "$branch")")]$message"
+#         branch="$("$getParent" "$branch")"
+#         counter=$(($counter - 1))
+#         if [ $counter -lt 0 ]; then
+#           echo -e "Sorry, there seems to be an error in the branch hierarchy causing an infinite loop."
+#           exit 1
+#         fi
+#       done
+#     fi
+#   else
+#     message="$(echo "$message" | sed "1 s|^\([^\[].*\)$| \1|")"
+#     message="[$(getTag "$branch")]$message"
+#   fi
+
+#   echo "$message" > $1
+# else
+#   message="$(echo "$message" | sed "1 s|^-||")"
+#   echo "$message" > $1
+# fi
