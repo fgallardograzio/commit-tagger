@@ -3,7 +3,7 @@
 # $1 = [optional] installation dir
 
 if [ -n "$1" ]; then
-  installDir="$1"
+  installDir="${1%%/}"
 else
   installDir=~/bin
   installDefault=true
@@ -13,43 +13,55 @@ if [ "$installDefault" = true -a ! -d "$installDir" ]; then
   mkdir "$installDir"
   if [ $? != 0 ]; then
     printf "There was a problem creating '$installDir'.\n" >&2
+    printf "Installation aborted.\n" >&2
     exit 1
   fi
 fi
 
 if [ ! -d "$installDir" ]; then
-  printf "Directory '$installDir' does not exist. Installation aborted.\n"
+  printf "Directory '$installDir' does not exist.\n" >&2
+  printf "Installation aborted.\n" >&2
+  exit 1
+fi
+
+if [ ! -f "git-commit-tagger" ]; then
+  printf "Cannot find 'git-commit-tagger'. Please make sure your working directory matches the install script's path.\n" >&2
+  printf "Installation aborted.\n" >&2
   exit 1
 fi
 
 printf "Installing 'git-commit-tagger' into '$installDir'.\n"
-cp "git-commit-tagger" "$installDir"
+cp git-commit-tagger "$installDir"
 if [ $? != 0 ]; then
   printf "There was a problem copying 'git-commit-tagger' to '$installDir'.\n" >&2
+  printf "Installation aborted.\n" >&2
   exit 1
 fi
 
 printf "Giving execute permissions to '$installDir/git-commit-tagger'.\n"
-chmod +x "$installDir/git-commit-tagger"
+chmod +x "$installDir"/git-commit-tagger
 if [ $? != 0 ]; then
   printf "There was a problem giving execute permissions to '$installDir/git-commit-tagger'.\n" >&2
+  printf "Installation aborted.\n" >&2
   exit 1
 fi
 
-printf "Installing needed files into '~/.commit-tagger'.\n"
+printf "Installing needed files into '$HOME/.commit-tagger'.\n"
 if [ ! -d ~/.commit-tagger ]; then
   mkdir ~/.commit-tagger
   if [ $? != 0 ]; then
-    printf "There was a problem creating '~/.commit-tagger'.\n"
+    printf "There was a problem creating '$HOME/.commit-tagger'.\n"
+    printf "Installation aborted.\n" >&2
     exit 1
   fi
 fi
 
 cp -R hooks ~/.commit-tagger
 if [ $? != 0 ]; then
-  printf "There was a problem copying 'hooks' into '~/.commit-tagger'.\n"
+  printf "There was a problem copying 'hooks' into '$HOME/.commit-tagger'.\n"
+  printf "Installation aborted.\n" >&2
   exit 1
 fi
 
-printf "Installation successful.\n"
+printf "\nInstallation successful.\n"
 exit 0
