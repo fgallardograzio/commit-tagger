@@ -2,66 +2,83 @@
 
 # $1 = [optional] installation dir
 
+function prompt {
+  # $1 = message
+
+  while true; do
+    printf "$1"
+    read promptRes
+    case "$promptRes" in
+      [yY]|[yY][eE][sS])
+        return 0
+        ;;
+      [nN]|[nN][oO])
+        return 1
+        ;;
+    esac
+  done
+}
+
+function abortInstall {
+  # $1 = condition, $2 = message
+
+  if [ $1 != 0 ]; then
+    printf "$2" >&2
+    printf "Installation aborted.\n" >&2
+    exit 1
+  fi
+}
+
+test -f "git-commit-tagger"
+abortInstall $? "Cannot find 'git-commit-tagger'. Please make sure your working directory matches the install script's path.\n"
+
 if [ -n "$1" ]; then
   installDir="${1%%/}"
 else
-  installDir=~/bin
+  installDir="$HOME"/bin
   installDefault=true
 fi
 
-if [ "$installDefault" = true -a ! -d "$installDir" ]; then
-  mkdir "$installDir"
-  if [ $? != 0 ]; then
-    printf "There was a problem creating '$installDir'.\n" >&2
-    printf "Installation aborted.\n" >&2
-    exit 1
-  fi
-fi
-
 if [ ! -d "$installDir" ]; then
-  printf "Directory '$installDir' does not exist.\n" >&2
-  printf "Installation aborted.\n" >&2
-  exit 1
-fi
-
-if [ ! -f "git-commit-tagger" ]; then
-  printf "Cannot find 'git-commit-tagger'. Please make sure your working directory matches the install script's path.\n" >&2
-  printf "Installation aborted.\n" >&2
-  exit 1
+  if [ "$installDefault" != true ]; then
+    prompt "Directory '$installDir' does not exist. Do you wish to create it? [yes or no]: "
+    abortInstall $?
+  fi
+  printf "Creating directory '$installDir'.\n"
+  mkdir -p "$installDir" &> /dev/null
+  abortInstall $? "There was a problem creating '$installDir'.\n"
 fi
 
 printf "Installing 'git-commit-tagger' into '$installDir'.\n"
-cp git-commit-tagger "$installDir"
-if [ $? != 0 ]; then
-  printf "There was a problem copying 'git-commit-tagger' to '$installDir'.\n" >&2
-  printf "Installation aborted.\n" >&2
-  exit 1
-fi
+cp git-commit-tagger "$installDir" &> /dev/null
+abortInstall $? "There was a problem copying 'git-commit-tagger' to '$installDir'.\n"
 
 printf "Giving execute permissions to '$installDir/git-commit-tagger'.\n"
-chmod +x "$installDir"/git-commit-tagger
-if [ $? != 0 ]; then
-  printf "There was a problem giving execute permissions to '$installDir/git-commit-tagger'.\n" >&2
-  printf "Installation aborted.\n" >&2
-  exit 1
+chmod +x "$installDir"/git-commit-tagger &> /dev/null
+abortInstall $? "There was a problem giving execute permissions to '$installDir/git-commit-tagger'.\n"
+
+if [ ! -d "$HOME"/.commit-tagger ]; then
+  printf "Creating directory '$HOME/.commit-tagger'.\n"
+  mkdir "$HOME"/.commit-tagger &> /dev/null
+  abortInstall $? "There was a problem creating '$HOME/.commit-tagger'.\n"
 fi
 
-printf "Installing needed files into '$HOME/.commit-tagger'.\n"
-if [ ! -d ~/.commit-tagger ]; then
-  mkdir ~/.commit-tagger
-  if [ $? != 0 ]; then
-    printf "There was a problem creating '$HOME/.commit-tagger'.\n"
-    printf "Installation aborted.\n" >&2
-    exit 1
-  fi
+printf "Saving 'installation_path' to '$HOME/.commit-tagger'.\n"
+printf "$installDir" > "$HOME"/.commit-tagger/installation_path
+test -f "$HOME"/.commit-tagger/installation_path
+abortInstall $? "There was a problem creating '$HOME/.commit-tagger/hooks'.\n"
+
+if [ ! -d "$HOME"/.commit-tagger/hooks ]; then
+  printf "Creating directory '$HOME/.commit-tagger/hooks'.\n"
+  mkdir "$HOME"/.commit-tagger/hooks &> /dev/null
+  abortInstall $? "There was a problem creating '$HOME/.commit-tagger/hooks'.\n"
 fi
 
-cp -R hooks ~/.commit-tagger
-if [ $? != 0 ]; then
-  printf "There was a problem copying 'hooks' into '$HOME/.commit-tagger'.\n"
-  printf "Installation aborted.\n" >&2
-  exit 1
-fi
+for file in hooks/*; do
+  printf "Copying '$file' into '"$HOME"/.commit-tagger/hooks'.\n"
+  cp "$file" "$HOME"/.commit-tagger/hooks &> /dev/null
+  abortInstall $? "There was a problem copying '$file' into '$HOME/.commit-tagger/hooks'.\n"
+done
 
 printf "\nInstallation successful.\n"
 exit 0

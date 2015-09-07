@@ -53,7 +53,8 @@ function tag {
   parentExists=$?
   tagIgnored="$(git config --get commit-tagger.tagignored || printf "true")"
   if  [ "$tagIgnored" != "true" -a "$tagIgnored" != "false" ]; then
-    printf "Invalid option found: 'commit-tagger.tagignored=$tagIgnored'. Allowed values are true (default) and false.\nPlease use 'git config commit-tagger.tagignored true|false' to set a valid configuration.\n" >&2
+    printf "Invalid option found: 'commit-tagger.tagignored=$tagIgnored'. Allowed values are true (default) and false.\n" >&2
+    printf "Please use 'git config commit-tagger.tagignored true|false' to set a valid configuration.\n" >&2
     return 1
   fi
   if ! isIgnored $1 || [ "$tagIgnored" = "true" ]; then
@@ -73,9 +74,6 @@ function tag {
     fi
     printf "$tags\n"
     return 0
-  else
-    printf "Branch \e[1m$1\e[0m is currently being ignored.\n" >&2
-    return 1
   fi
 }
 
@@ -113,8 +111,7 @@ function get-parent {
 # -------- set-parent --------
 
 function set-parent {
-  # $1 = branch
-  # $2 = parentBranch
+  # $1 = branch, $2 = parentBranch
 
   local parent
   local counter
@@ -197,6 +194,7 @@ function ignore {
 
 # -------- /ignore --------
 
+
 # -------- unignore --------
 
 function unignore {
@@ -230,7 +228,7 @@ function install-hooks {
   local fileName
   hooksDir="$(git rev-parse --git-dir)/hooks"
   printf "Repository's Hooks directory: $hooksDir\n\n"
-  for file in ~/.commit-tagger/hooks/*; do
+  for file in "$HOME"/.commit-tagger/hooks/*; do
     fileName="$(basename "$file")"
     printf "Installing '$fileName'...\n"
     if ! cp "$file" "$hooksDir"; then
@@ -249,6 +247,29 @@ function install-hooks {
 # -------- /install-hooks --------
 
 
+# -------- uninstall-hooks --------
+
+function uninstall-hooks {
+  local hooksDir
+  local file
+  local fileName
+  hooksDir="$(git rev-parse --git-dir)/hooks"
+  printf "Repository's Hooks directory: $hooksDir\n\n"
+  for file in "$HOME"/.commit-tagger/hooks/*; do
+    fileName="$(basename "$file")"
+    printf "Removing '$fileName'...\n"
+    if ! rm "$hooksDir/$fileName"; then
+      printf "There was a problem removing '$fileName' from '$hooksDir'.\n" >&2
+      return 1
+    fi
+  done
+  printf "\nHooks successfully uninstalled.\n"
+  return 0
+}
+
+# -------- /uninstall-hooks --------
+
+
 # -------- usage --------
 
 function usage {
@@ -263,6 +284,7 @@ Available commands:
   ignore [<branch> [<branch> ...]]
   unignore [<branch> [<branch> ...]]
   install-hooks
+  uninstall-hooks
   help
 
 Commands description:
@@ -275,19 +297,24 @@ Commands description:
                     Branches created with <branch> as base won't automatically have <branch> set as parent.
   unignore          No longer ignore <branch>, or the current branch if omitted.
   install-hooks     Install commit-tagger's hooks into the current git repository.
+  uninstall-hooks   Remove commit-tagger's hooks from the current git repository.
   help              Show this message.
 
 Configuration:
   git config commit-tagger.<setting> <value>
 
 Available settings:
-  hooksenabled
-  checkoutenabled
-  commitmsgenabled
-  testenabled
-  tagignored
-  mode
-  confirm
+  hooksenabled      [true|false] Enable all of commit-tagger's hooks in this repository. Default: true.
+  checkoutenabled   [true|false] Enable the 'post-checkout' hook. Default true.
+  commitmsgenabled  [true|false] Enable the 'prepare-commit-msg' hook to tag messages. Default true.
+  testsenabled      [true|false] Enable the 'pre-commit' hook to test the files to be commited. Default: true.
+  testsverbose      [true|false] Show the output of all the tests. Default: false.
+  tagignored        [true|false] Tag commit messages on ignored branches. Default: true.
+  confirm           [true|false] Ask for confirmation before actually issuing the commit.
+                    Only when -m of -F is used. Default: true
+  tagMode           [opt-in|opt-out] Default: opt-out.
+                    opt-in: Do not tag commit messages unless prefixed with a "+" symbol.
+                    opt-out: Tag all commit messages automatically unless prefixed with a "-" symbol.
 EOF
 }
 
@@ -298,11 +325,12 @@ EOF
 
 function checkArgs {
   # $1 = min, $2 = max, $3 = argc, $4+ = argv
+
   if [ $3 -lt $1 ]; then
-    printf "Missing required argument for command '$4'.\nPlease run 'git commit-tagger help' to see the list of available commands\n" >&2
+    printf "Missing required arguments for command '$4'.\nPlease run 'git commit-tagger help' to see the list of available commands.\n" >&2
     exit 1
   elif [ $3 -gt $2 ]; then
-    printf "Invalid arguments: '${@:5}' for command '$4'.\nPlease run 'git commit-tagger help' to see the list of available commands\n" >&2
+    printf "Invalid arguments: '${@:5}' for command '$4'.\nPlease run 'git commit-tagger help' to see the list of available commands.\n" >&2
     exit 1
   fi
 }
@@ -373,6 +401,12 @@ case "$1" in
     install-hooks
   ;;
 
+  # uninstall-hooks
+  "uninstall-hooks")
+    checkArgs 1 1 $# $@
+    uninstall-hooks
+  ;;
+
   # help
   "help")
     checkArgs 1 1 $# $@
@@ -387,7 +421,7 @@ case "$1" in
 
   # invalid command
   *)
-    printf "Invalid command: '$1'.\nPlease run 'git commit-tagger help' to see the list of available commands\n" >&2
+    printf "Invalid command: '$1'.\nPlease run 'git commit-tagger help' to see the list of available commands.\n" >&2
     exit 1
   ;;
 esac

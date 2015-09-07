@@ -1,0 +1,49 @@
+#!/bin/bash
+
+installDir="$(cat "$HOME"/.commit-tagger/installation_path  2> /dev/null)"
+
+function prompt {
+  # $1 = message
+
+  while true; do
+    printf "$1"
+    read promptRes
+    case "$promptRes" in
+      [yY]|[yY][eE][sS])
+        return 0
+        ;;
+      [nN]|[nN][oO])
+        return 1
+        ;;
+    esac
+  done
+}
+
+function abortUninstall {
+  # $1 = condition, $2 = message
+
+  if [ $1 != 0 ]; then
+    printf "$2" >&2
+    printf "Uninstallation aborted.\n" >&2
+    exit 1
+  fi
+}
+
+test -n "$installDir"
+abortUninstall $? "File '$HOME/.commit-tagger/installation_path' not found or empty.\n"
+
+printf "You are about to uninstall 'commit-tagger'. The following files and folders will be permanently deleted:\n\n"
+printf "$installDir/git-commit-tagger\n"
+find "$HOME"/.commit-tagger
+printf "\n"
+prompt "Do you wish to continue? [yes or no]: "
+abortUninstall $?
+
+rm "$installDir"/git-commit-tagger &> /dev/null
+abortUninstall $? "Cannot delete '$installDir/git-commit-tagger'.\n"
+
+rm -R "$HOME"/.commit-tagger &> /dev/null
+abortUninstall $? "An error occurred while deleting the contents of '$HOME/.commit-tagger'.\n"
+
+printf "\nUninstallation successful.\n"
+exit 0
