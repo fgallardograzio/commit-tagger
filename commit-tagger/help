@@ -1,16 +1,25 @@
 Usage: git commit-tagger <command> [<args>]
 
-Available commands are:
-  set-parent [<branch>] <parent>
-    Specify <parent> as the parent branch of <branch>, or the current branch if omitted.
-    This will result in a commit message tag of the form '[<parent>][<branch>]'.
+Available commands:
+  tag [<branch>]
   get-parent [<branch>]
-    Get the name of the parent of <branch>, or the current branch if omitted.
+  set-parent [<branch>] <parent>
   remove-parent [<branch>]
-    Remove the parent associated to <branch>, or the current branch if omitted.
-  ignore [<branch>]
-    This will result in <branch>, or the current branch if omitted, being ignored, which means
-    messages from commits on <branch> won't be tagged, and branches created with <branch> as base,
-    won't automatically have <branch> set as parent.
-  test [<branch>]
-    Run the tests
+  ignore [<branch> [<branch> ...]]
+  unignore [<branch> [<branch> ...]]
+  install-hooks
+  help
+
+Commands description:
+  tag               Get the full list of tags for <branch>, or the current branch if omitted.
+  get-parent        Get the name of the parent of <branch>, or the current branch if omitted.
+  set-parent        Specify <parent> as the parent branch of <branch>, or the current branch if omitted.
+                    The <parent> branch's tag will be included in the commit messages of <branch>.
+  remove-parent     Remove the parent associated to <branch>, or the current branch if omitted.
+  ignore            This will result in <branch>, or the current branch if omitted, being ignored.
+                    Branches created with <branch> as base won't automatically have <branch> set as parent.
+  unignore          No longer ignore <branch>, or the current branch if omitted.
+  install-hooks     Install commit-tagger's hooks into the current git repository.
+  help              Show this description.
+
+git config --get commit-tagger.tagignoredbranches

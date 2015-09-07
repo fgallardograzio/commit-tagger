@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# $1 = [optional] installation dir
+
+if [ -n "$1" ]; then
+  installDir="$1"
+else
+  installDir=~/bin
+  installDefault=true
+fi
+
+if [ "$installDefault" = true -a ! -d "$installDir" ]; then
+  mkdir "$installDir"
+  if [ $? != 0 ]; then
+    printf "There was a problem creating '$installDir'.\n" >&2
+    exit 1
+  fi
+fi
+
+if [ ! -d "$installDir" ]; then
+  printf "Directory '$installDir' does not exist. Installation aborted.\n"
+  exit 1
+fi
+
+printf "Installing 'git-commit-tagger' into '$installDir'.\n"
+cp "git-commit-tagger" "$installDir"
+if [ $? != 0 ]; then
+  printf "There was a problem copying 'git-commit-tagger' to '$installDir'.\n" >&2
+  exit 1
+fi
+
+printf "Giving execute permissions to '$installDir/git-commit-tagger'.\n"
+chmod +x "$installDir/git-commit-tagger"
+if [ $? != 0 ]; then
+  printf "There was a problem giving execute permissions to '$installDir/git-commit-tagger'.\n" >&2
+  exit 1
+fi
+
+printf "Installing needed files into '~/.commit-tagger'.\n"
+if [ ! -d ~/.commit-tagger ]; then
+  mkdir ~/.commit-tagger
+  if [ $? != 0 ]; then
+    printf "There was a problem creating '~/.commit-tagger'.\n"
+    exit 1
+  fi
+fi
+
+cp -R hooks ~/.commit-tagger
+if [ $? != 0 ]; then
+  printf "There was a problem copying 'hooks' into '~/.commit-tagger'.\n"
+  exit 1
+fi
+
+printf "Installation successful.\n"
+exit 0

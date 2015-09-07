@@ -1,47 +1,395 @@
 #!/bin/bash
 
-function showHelp {
-  cat "commit-tagger/help"
+
+# -------- general --------
+
+parentsFile="$(git rev-parse --git-dir)/commit-tagger.parents"
+ignoredFile="$(git rev-parse --git-dir)/commit-tagger.ignored"
+parents="$(cat "$parentsFile" 2> /dev/null)"
+ignored="$(cat "$ignoredFile" 2> /dev/null)"
+
+function getParent {
+  #$1 = branch
+
+  local parent
+  parent="$(printf "$parents" | sed -n "s|^$1:||p" | head -1)"
+  if [ -n "$parent" ]; then
+    printf "$parent"
+    return 0
+  else
+    return 1
+  fi
+}
+
+function isIgnored {
+  # $1 = branch
+
+  printf "$ignored" | grep -q "^$1$"
+  return $?
+}
+
+# -------- /general --------
+
+
+# -------- tag --------
+
+function getTag {
+  # $1 = branch
+
+  # printf "$(printf $1 | sed "s|.*\/||")"
+  printf "${1##*/}"
+  return 0
+}
+
+function tag {
+  # $1 = branch
+
+  local parent
+  local parentExists
+  local tags
+  local counter
+  local tagIgnored
+  parent="$(getParent "$1")"
+  parentExists=$?
+  tagIgnored="$(git config --get commit-tagger.tagignored || printf "true")"
+  if  [ "$tagIgnored" != "true" -a "$tagIgnored" != "false" ]; then
+    printf "Invalid option found: 'commit-tagger.tagignored=$tagIgnored'. Allowed values are true (default) and false.\nPlease use 'git config commit-tagger.tagignored true|false' to set a valid configuration.\n" >&2
+    return 1
+  fi
+  if ! isIgnored $1 || [ "$tagIgnored" = "true" ]; then
+    tags="[$(getTag "$1")]"
+    if [ "$parentExists" -eq 0 ]; then
+      counter=20
+      while [ "$parentExists" -eq 0 ] && ! isIgnored "$parent"; do
+        tags="[$(getTag "$parent")]$tags"
+        parent="$(getParent "$parent")"
+        parentExists=$?
+        counter=$(($counter - 1))
+        if [ $counter -lt 0 ]; then
+          printf "Sorry, there seems to be an error in the branch hierarchy causing an infinite loop.\n" >&2
+          return 1
+        fi
+      done
+    fi
+    printf "$tags\n"
+    return 0
+  else
+    printf "Branch \e[1m$1\e[0m is currently being ignored.\n" >&2
+    return 1
+  fi
+}
+
+# -------- /tag --------
+
+
+# -------- get-parent --------
+
+function get-parent {
+  # $1 = branch
+
+  local parent
+  parent=$(printf "$parents" | grep "^$1:" | head -1 | sed "s|^$1:||")
+  if [ -n "$parent" ]; then
+    printf "The parent of branch \e[1m$1\e[0m is \e[1m$parent\e[0m.\n"
+    if isIgnored "$1"; then
+      printf "Branch \e[1m$1\e[0m is being ignored.\n"
+    fi
+    if isIgnored "$parent"; then
+      printf "Branch \e[1m$parent\e[0m is being ignored.\n"
+    fi
+    return 0
+  else
+    printf "Branch \e[1m$1\e[0m does not have a parent.\n"
+    if isIgnored "$1"; then
+      printf "Branch \e[1m$1\e[0m is being ignored.\n"
+    fi
+    return 1
+  fi
+}
+
+# -------- /get-parent --------
+
+
+# -------- set-parent --------
+
+function set-parent {
+  # $1 = branch
+  # $2 = parentBranch
+
+  local parent
+  local counter
+  parent="$2"
+  counter=20
+  if [ "$1" = "$2" ]; then
+    printf "Branch \e[1m$1\e[0m cannot be its own parent.\n" >&2
+    return 1
+  fi
+  while getParent "$parent" > /dev/null; do
+    parent="$(getParent "$parent")"
+    counter=$(($counter - 1))
+    if [ "$parent" = "$1" -o $counter -lt 0 ]; then
+      printf "The parent of branch \e[1m$1\e[0m cannot be \e[1m$2\e[0m since that would result in an infinite loop.\n" >&2
+      return 1
+    fi
+  done
+  if getParent "$1" > /dev/null; then
+    sed "s|^$1:.*$|$1:$2|g" "$parentsFile" > "$parentsFile.new" && mv "$parentsFile.new" "$parentsFile"
+  else
+    printf "$1:$2\n" >> "$parentsFile"
+  fi
+  printf "The parent of branch \e[1m$1\e[0m has been set to \e[1m$2\e[0m.\n"
+  if isIgnored "$1"; then
+    printf "Branch \e[1m$1\e[0m is being ignored.\n"
+  fi
+  if isIgnored "$2"; then
+    printf "Branch \e[1m$2\e[0m is being ignored.\n"
+  fi
+  return 0
+}
+
+# -------- /set-parent --------
+
+
+# -------- remove-parent --------
+
+function remove-parent {
+  # $1 = branch
+
+  local parent
+  parent="$(getParent "$1")"
+  if [ $? -eq 0 ]; then
+    parents="$(grep -v "^$1:" "$parentsFile")"
+    if [ -n "$parents" ]; then
+      printf "$parents\n" > "$parentsFile"
+    else
+      printf "" > "$parentsFile"
+    fi
+    printf "Branch \e[1m$1\e[0m no longer has \e[1m$parent\e[0m set as parent.\n"
+  else
+    printf "There isn't any parent set for branch \e[1m$1\e[0m.\n"
+  fi
+  if isIgnored "$1"; then
+    printf "Branch \e[1m$1\e[0m is being ignored.\n"
+  fi
+  return 0
+}
+
+# -------- /remove-parent --------
+
+
+# -------- ignore --------
+
+function ignore {
+  # $@ = list of branches
+
+  local branch
+  for branch in "$@"; do
+    if ! isIgnored "$branch"; then
+      ignored="$ignored\n$branch"
+      printf "$branch\n" >> "$ignoredFile"
+      printf "Branch \e[1m$branch\e[0m is now being ignored.\n"
+    else
+      printf "Branch \e[1m$branch\e[0m is already being ignored.\n"
+    fi
+  done
+  return 0
+}
+
+# -------- /ignore --------
+
+# -------- unignore --------
+
+function unignore {
+  # $@ = list of branches
+
+  local branch
+  for branch in "$@"; do
+    if isIgnored "$branch"; then
+      ignored="$(grep -v "^$branch$" "$ignoredFile")"
+      if [ -n "$ignored" ]; then
+        printf "$ignored\n" > "$ignoredFile"
+      else
+        printf "" > "$ignoredFile"
+      fi
+      printf "Branch \e[1m$branch\e[0m is no longer being ignored.\n"
+    else
+      printf "Branch \e[1m$branch\e[0m is not currently beign ignored.\n"
+    fi
+  done
+  return 0
+}
+
+# -------- /unignore --------
+
+
+# -------- install-hooks --------
+
+function install-hooks {
+  local hooksDir
+  local file
+  local fileName
+  hooksDir="$(git rev-parse --git-dir)/hooks"
+  printf "Repository's Hooks directory: $hooksDir\n\n"
+  for file in ~/.commit-tagger/hooks/*; do
+    fileName="$(basename "$file")"
+    printf "Installing '$fileName'...\n"
+    if ! cp "$file" "$hooksDir"; then
+      printf "There was a problem copying '$file' to '$hooksDir'.\n" >&2
+      return 1
+    fi
+    if ! chmod +x "$hooksDir/$fileName"; then
+      printf "There was a problem giving execute permissions to '$hooksDir/$fileName'.\n" >&2
+      return 1
+    fi
+  done
+  printf "\nHooks successfully installed.\n"
+  return 0
+}
+
+# -------- /install-hooks --------
+
+
+# -------- usage --------
+
+function usage {
+  cat <<"EOF"
+Usage: git commit-tagger <command> [<args>]
+
+Available commands:
+  tag [<branch>]
+  get-parent [<branch>]
+  set-parent [<branch>] <parent>
+  remove-parent [<branch>]
+  ignore [<branch> [<branch> ...]]
+  unignore [<branch> [<branch> ...]]
+  install-hooks
+  help
+
+Commands description:
+  tag               Get the full list of tags for <branch>, or the current branch if omitted.
+  get-parent        Get the name of the parent of <branch>, or the current branch if omitted.
+  set-parent        Specify <parent> as the parent branch of <branch>, or the current branch if omitted.
+                    The <parent> branch's tag will be included in the commit messages of <branch>.
+  remove-parent     Remove the parent associated to <branch>, or the current branch if omitted.
+  ignore            This will result in <branch>, or the current branch if omitted, being ignored.
+                    Branches created with <branch> as base won't automatically have <branch> set as parent.
+  unignore          No longer ignore <branch>, or the current branch if omitted.
+  install-hooks     Install commit-tagger's hooks into the current git repository.
+  help              Show this message.
+
+Configuration:
+  git config commit-tagger.<setting> <value>
+
+Available settings:
+  hooksenabled
+  checkoutenabled
+  commitmsgenabled
+  testenabled
+  tagignored
+  mode
+  confirm
+EOF
+}
+
+# -------- /usage --------
+
+
+# -------- main --------
+
+function checkArgs {
+  # $1 = min, $2 = max, $3 = argc, $4+ = argv
+  if [ $3 -lt $1 ]; then
+    printf "Missing required argument for command '$4'.\nPlease run 'git commit-tagger help' to see the list of available commands\n" >&2
+    exit 1
+  elif [ $3 -gt $2 ]; then
+    printf "Invalid arguments: '${@:5}' for command '$4'.\nPlease run 'git commit-tagger help' to see the list of available commands\n" >&2
+    exit 1
+  fi
 }
 
 case "$1" in
-  "set-parent")
-    # specify parent for the given branch
-    echo "set-parent"
+  # tag [<branch>]
+  "tag")
+    checkArgs 1 2 $# $@
+    # "${2:-"$(git rev-parse --abbrev-ref HEAD)"}"
+    if [ -n "$2" ]; then
+      tag "$2"
+    else
+      tag "$(git rev-parse --abbrev-ref HEAD)"
+    fi
   ;;
 
+  # get-parent [<branch>]
   "get-parent")
-    # get
-    "commit-tagger/get-branch-parent" "$2"
+    checkArgs 1 2 $# $@
+    if [ -n "$2" ]; then
+      get-parent "$2"
+    else
+      get-parent "$(git rev-parse --abbrev-ref HEAD)"
+    fi
   ;;
 
+  # set-parent [<branch>] <parent>
+  "set-parent")
+    checkArgs 2 3 $# $@
+    if [ -n "$3" ]; then
+      set-parent "$2" "$3"
+    else
+      set-parent "$(git rev-parse --abbrev-ref HEAD)" "$2"
+    fi
+  ;;
+
+  # remove-parent [<branch>]
   "remove-parent")
-    # remove
-    "commit-tagger/set-branch-parent" "$2" "--remove"
+    checkArgs 1 2 $# $@
+    if [ -n "$2" ]; then
+      remove-parent "$2"
+    else
+      remove-parent "$(git rev-parse --abbrev-ref HEAD)"
+    fi
   ;;
 
+  # ignore [<branch> [<branch> ...]]
   "ignore")
-    # ignore
-    "commit-tagger/set-branch-parent" "$2" "--ignore"
+    if [ -n "$2" ]; then
+      ignore "${@:2}"
+    else
+      ignore "$(git rev-parse --abbrev-ref HEAD)"
+    fi
   ;;
 
-  "test")
-    # test
-    "commit-tagger/test-branch" "$2"
+  # unignore [<branch> [<branch> ...]]
+  "unignore")
+    if [ -n "$2" ]; then
+      unignore "${@:2}"
+    else
+      unignore "$(git rev-parse --abbrev-ref HEAD)"
+    fi
   ;;
 
+  # install-hooks
+  "install-hooks")
+    checkArgs 1 1 $# $@
+    install-hooks
+  ;;
+
+  # help
   "help")
-    # help
-    showHelp
+    checkArgs 1 1 $# $@
+    usage
   ;;
 
+  # no command provided
   "")
-    showHelp
+    usage
     exit 1
   ;;
 
+  # invalid command
   *)
-    echo -e "Invalid command: '$1'.\nPlease run 'git commit-tagger help' to see available commands" >&2
+    printf "Invalid command: '$1'.\nPlease run 'git commit-tagger help' to see the list of available commands\n" >&2
     exit 1
   ;;
 esac
+
+# -------- /main --------

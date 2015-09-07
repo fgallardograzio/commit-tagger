@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# $@ = list of branches
+
+ignoredFile="$(git rev-parse --git-dir)/commit-tagger.ignored"
+ignored="$(cat "$ignoredFile" 2> /dev/null)"
+
+function isIgnored {
+  # $1 = branch
+  printf "$ignored" | grep -q "^$1$"
+  return $?
+}
+
+for branch in "$@"; do
+  if ! isIgnored "$branch"; then
+    ignored="$ignored\n$branch"
+    printf "$branch\n" >> "$ignoredFile"
+    printf "Branch \e[1m$branch\e[0m is now being ignored.\n"
+  else
+    printf "Branch \e[1m$branch\e[0m is already being ignored.\n"
+  fi
+done
+
+exit 0

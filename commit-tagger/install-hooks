@@ -1,0 +1,7 @@
+#!/bin/bash
+
+hooksDir="$(git rev-parse --git-dir)/hooks"
+
+for file in "hooks"/*; do
+  printf "Installing $file...\n"
+done
