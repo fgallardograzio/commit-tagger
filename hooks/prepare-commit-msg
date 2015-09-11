@@ -37,7 +37,7 @@ function prompt {
   while true; do
     printf "%s" "$1"
     exec < /dev/tty
-    read promptRes
+    read -r promptRes
     case "$promptRes" in
       [yY]|[yY][eE][sS])
         return 0
@@ -55,12 +55,16 @@ function tagMessage {
   local str
   #str="$(echo "$1" | sed "1 s|^\([^\[].*\)$| \1|")"
   if [ "${1:0:1}" = "[" ]; then
-    str="$(git commit-tagger tag)$1"
+    str="$(git commit-tagger tag 2> /dev/null)$1"
   else
-    str="$(git commit-tagger tag) $1"
+    str="$(git commit-tagger tag 2> /dev/null) $1"
   fi
   if [ $? != 0 ]; then
-    exit 1
+    printf "\nError: commit-tagger cannot be found. Please re-install it or remove this hook from your repository.\n" >&2
+    printf "You can do so by deleting '%s'.\n" "$(git rev-parse --git-dir)/hooks/prepare-commit-msg" >&2
+    printf "If you continue with this commit it will not be tagged or affected in any way.\n\n" >&2
+    prompt "Do you wish to continue? [yes or no]: " >&2
+    exit $(($? + 1))
   fi
   printf "%s" "$str"
   return 0
@@ -71,14 +75,14 @@ case "$tagMode" in
     # if echo "$message" | head -1 | grep -q "^+"; then
     #   message="$(echo "$message" | sed "1 s|^+||")"
     if [ "${message:0:1}" = "+" ]; then
-      message="$(tagMessage "${message:1}")"
+      message="$(tagMessage "${message:1}")" || exit $(($? - 1))
     fi
   ;;
 
   "opt-out")
     # if echo "$message" | head -1 | grep -q -v "^-"; then
     if [ "${message:0:1}" != "-" ]; then
-      message="$(tagMessage "$message")"
+      message="$(tagMessage "$message")" || exit $(($? - 1))
     else
       # message="$(echo "$message" | sed "1 s|^-||")"
       message="${message:1}"

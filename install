@@ -7,7 +7,7 @@ function prompt {
 
   while true; do
     printf "%s" "$1"
-    read promptRes
+    read -r promptRes
     case "$promptRes" in
       [yY]|[yY][eE][sS])
         return 0
@@ -23,14 +23,14 @@ function abortInstall {
   # $1 = condition, $2 = message
 
   if [ $1 != 0 ]; then
-    printf "%s" "$2" >&2
+    printf "%s\n" "$2" >&2
     printf "Installation aborted.\n" >&2
     exit 1
   fi
 }
 
 test -f "git-commit-tagger"
-abortInstall $? "Cannot find 'git-commit-tagger'. Please make sure your working directory matches the install script's path.\n"
+abortInstall $? "Cannot find 'git-commit-tagger'. Please make sure your working directory matches the install script's path."
 
 if [ -n "$1" ]; then
   installDir="${1%%/}"
@@ -46,38 +46,38 @@ if [ ! -d "$installDir" ]; then
   fi
   printf "Creating directory '%s'.\n" "$installDir"
   mkdir -p "$installDir" &> /dev/null
-  abortInstall $? "There was a problem creating '$installDir'.\n"
+  abortInstall $? "There was a problem creating '$installDir'."
 fi
 
 printf "Installing 'git-commit-tagger' into '%s'.\n" "$installDir"
 cp git-commit-tagger "$installDir" &> /dev/null
-abortInstall $? "There was a problem copying 'git-commit-tagger' to '$installDir'.\n"
+abortInstall $? "There was a problem copying 'git-commit-tagger' to '$installDir'."
 
 printf "Giving execute permissions to '%s/git-commit-tagger'.\n" "$installDir"
 chmod +x "$installDir"/git-commit-tagger &> /dev/null
-abortInstall $? "There was a problem giving execute permissions to '$installDir/git-commit-tagger'.\n"
+abortInstall $? "There was a problem giving execute permissions to '$installDir/git-commit-tagger'."
 
 if [ ! -d "$HOME"/.commit-tagger ]; then
   printf "Creating directory '%s/.commit-tagger'.\n" "$HOME"
   mkdir "$HOME"/.commit-tagger &> /dev/null
-  abortInstall $? "There was a problem creating '$HOME/.commit-tagger'.\n"
+  abortInstall $? "There was a problem creating '$HOME/.commit-tagger'."
 fi
 
 printf "Saving 'installation_path' to '%s/.commit-tagger'.\n" "$HOME"
 printf "%s" "$installDir" > "$HOME"/.commit-tagger/installation_path
 test -f "$HOME"/.commit-tagger/installation_path
-abortInstall $? "There was a problem creating '$HOME/.commit-tagger/hooks'.\n"
+abortInstall $? "There was a problem creating '$HOME/.commit-tagger/hooks'."
 
 if [ ! -d "$HOME"/.commit-tagger/hooks ]; then
   printf "Creating directory '%s/.commit-tagger/hooks'.\n" "$HOME"
   mkdir "$HOME"/.commit-tagger/hooks &> /dev/null
-  abortInstall $? "There was a problem creating '$HOME/.commit-tagger/hooks'.\n"
+  abortInstall $? "There was a problem creating '$HOME/.commit-tagger/hooks'."
 fi
 
 for file in hooks/*; do
   printf "Copying '%s' into '%s/.commit-tagger/hooks'.\n" "$file" "$HOME"
   cp "$file" "$HOME"/.commit-tagger/hooks &> /dev/null
-  abortInstall $? "There was a problem copying '$file' into '$HOME/.commit-tagger/hooks'.\n"
+  abortInstall $? "There was a problem copying '$file' into '$HOME/.commit-tagger/hooks'."
 done
 
 printf "\nInstallation successful.\n"

@@ -1,4 +1,82 @@
 #!/bin/bash
 
-echo "running pre-commit!"
-#sleep 5
+hooksEnabled="$(git config --get commit-tagger.hooksenabled || printf "true")"
+testsEnabled="$(git config --get commit-tagger.testsenabled || printf "true")"
+testsVerbose="$(git config --get commit-tagger.testsverbose || printf "false")"
+
+if [ "$hooksEnabled" = "false" ]; then
+  exit 0
+elif [ "$hooksEnabled" != "true" ]; then
+  printf "Invalid option found: commit-tagger.hooksenabled=%s. Allowed values are true (default) and false.\n" "$hooksEnabled" >&2
+  printf "Please use 'git config commit-tagger.hooksenabled true|false' to set a valid configuration.\n" >&2
+  exit 1
+fi
+
+if [ "$testsEnabled" = "false" ]; then
+  exit 0
+elif [ "$testsEnabled" != "true" ]; then
+  printf "Invalid option found: commit-tagger.testsenabled=%s. Allowed values are true (default) and false.\n" "$testsEnabled" >&2
+  printf "Please use 'git config commit-tagger.testsenabled true|false' to set a valid configuration.\n" >&2
+  exit 1
+fi
+
+if [ "$testsVerbose" != "true" -a "$testsVerbose" != "false" ]; then
+  printf "Invalid option found: commit-tagger.testsverbose=%s. Allowed values are true and false (default).\n" "$testsVerbose" >&2
+  printf "Please use 'git config commit-tagger.testsverbose true|false' to set a valid configuration.\n" >&2
+  exit 1
+fi
+
+function runCommand {
+  # $@ = command
+
+  if [ "$failed" = "true" ]; then
+    return 1
+  fi
+  printf "Running: %s\n" "$*"
+  if [ "$testsVerbose" = "true" ]; then
+    $@
+  else
+    $@ > /dev/null 2>&1
+  fi
+  if [ $? = 0 ]; then
+    printf "Success: %s\n" "$*"
+    return 0
+  else
+    printf "Failed: %s\n" "$*"
+    failed="true"
+    return 1
+  fi
+}
+
+# Let's keep in our working directory only the staged files
+printf "Stashing unstaged files.\n\n"
+git stash save --keep-index --include-untracked --quiet 'commit-tagger: pre-commit test - unstaged files'
+if [ $? != 0 ]; then
+  printf "An error occurred while trying to save the working directory to a new stash.\n"
+  printf "Commit aborted.\n"
+  exit 1
+fi
+
+# trap cleanup EXIT
+# TODO: can't bash traps work in a hook?
+
+# Run your tests here!
+# runCommand gulp build:prod
+ runCommand test -n "hola"
+
+# Restore working directory
+printf "\nRestoring working directory from stash.\n"
+git stash pop --quiet
+if [ $? != 0 ]; then
+  printf "An error occurred while trying to restore the working directory from the saved stash.\n"
+  printf "Please try to run 'git stash pop' yourself.\n"
+  printf "Commit aborted.\n"
+  exit 1
+fi
+
+if [ "$failed" = "true" ]; then
+  printf "Commit aborted.\n"
+  exit 1
+else
+  exit 0
+fi

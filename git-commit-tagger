@@ -229,6 +229,10 @@ function install-hooks {
   hooksDir="$(git rev-parse --git-dir)/hooks"
   printf "Repository's Hooks directory: %s\n\n" "$hooksDir"
   for file in "$HOME"/.commit-tagger/hooks/*; do
+    if [ ! -e "$file" ]; then
+      printf "Directory '%s' does not exist or does not contain any files.\nInstallation aborted.\n" "$HOME/.commit-tagger/hooks"
+      exit 1
+    fi
     fileName="$(basename "$file")"
     printf "Installing '%s'...\n" "$fileName"
     if ! cp "$file" "$hooksDir"; then
@@ -256,6 +260,10 @@ function uninstall-hooks {
   hooksDir="$(git rev-parse --git-dir)/hooks"
   printf "Repository's Hooks directory: %s\n\n" "$hooksDir"
   for file in "$HOME"/.commit-tagger/hooks/*; do
+    if [ ! -e "$file" ]; then
+      printf "Directory '%s' does not exist or does not contain any files.\nInstallation aborted.\n" "$HOME/.commit-tagger/hooks"
+      exit 1
+    fi
     fileName="$(basename "$file")"
     printf "Removing '%s'...\n" "$fileName"
     if ! rm "$hooksDir/$fileName"; then
