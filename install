@@ -6,7 +6,7 @@ function prompt {
   # $1 = message
 
   while true; do
-    printf "$1"
+    printf "%s" "$1"
     read promptRes
     case "$promptRes" in
       [yY]|[yY][eE][sS])
@@ -23,7 +23,7 @@ function abortInstall {
   # $1 = condition, $2 = message
 
   if [ $1 != 0 ]; then
-    printf "$2" >&2
+    printf "%s" "$2" >&2
     printf "Installation aborted.\n" >&2
     exit 1
   fi
@@ -44,38 +44,38 @@ if [ ! -d "$installDir" ]; then
     prompt "Directory '$installDir' does not exist. Do you wish to create it? [yes or no]: "
     abortInstall $?
   fi
-  printf "Creating directory '$installDir'.\n"
+  printf "Creating directory '%s'.\n" "$installDir"
   mkdir -p "$installDir" &> /dev/null
   abortInstall $? "There was a problem creating '$installDir'.\n"
 fi
 
-printf "Installing 'git-commit-tagger' into '$installDir'.\n"
+printf "Installing 'git-commit-tagger' into '%s'.\n" "$installDir"
 cp git-commit-tagger "$installDir" &> /dev/null
 abortInstall $? "There was a problem copying 'git-commit-tagger' to '$installDir'.\n"
 
-printf "Giving execute permissions to '$installDir/git-commit-tagger'.\n"
+printf "Giving execute permissions to '%s/git-commit-tagger'.\n" "$installDir"
 chmod +x "$installDir"/git-commit-tagger &> /dev/null
 abortInstall $? "There was a problem giving execute permissions to '$installDir/git-commit-tagger'.\n"
 
 if [ ! -d "$HOME"/.commit-tagger ]; then
-  printf "Creating directory '$HOME/.commit-tagger'.\n"
+  printf "Creating directory '%s/.commit-tagger'.\n" "$HOME"
   mkdir "$HOME"/.commit-tagger &> /dev/null
   abortInstall $? "There was a problem creating '$HOME/.commit-tagger'.\n"
 fi
 
-printf "Saving 'installation_path' to '$HOME/.commit-tagger'.\n"
-printf "$installDir" > "$HOME"/.commit-tagger/installation_path
+printf "Saving 'installation_path' to '%s/.commit-tagger'.\n" "$HOME"
+printf "%s" "$installDir" > "$HOME"/.commit-tagger/installation_path
 test -f "$HOME"/.commit-tagger/installation_path
 abortInstall $? "There was a problem creating '$HOME/.commit-tagger/hooks'.\n"
 
 if [ ! -d "$HOME"/.commit-tagger/hooks ]; then
-  printf "Creating directory '$HOME/.commit-tagger/hooks'.\n"
+  printf "Creating directory '%s/.commit-tagger/hooks'.\n" "$HOME"
   mkdir "$HOME"/.commit-tagger/hooks &> /dev/null
   abortInstall $? "There was a problem creating '$HOME/.commit-tagger/hooks'.\n"
 fi
 
 for file in hooks/*; do
-  printf "Copying '$file' into '"$HOME"/.commit-tagger/hooks'.\n"
+  printf "Copying '%s' into '%s/.commit-tagger/hooks'.\n" "$file" "$HOME"
   cp "$file" "$HOME"/.commit-tagger/hooks &> /dev/null
   abortInstall $? "There was a problem copying '$file' into '$HOME/.commit-tagger/hooks'.\n"
 done

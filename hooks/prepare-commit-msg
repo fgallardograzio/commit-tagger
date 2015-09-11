@@ -5,20 +5,20 @@
 message="$(cat $1)"
 branch="$(git rev-parse --abbrev-ref HEAD)"
 
-hooksEnabled="$(git config --get commit-tagger.hooksenabled || echo "true")"
-commitmsgEnabled="$(git config --get commit-tagger.commitmsgenabled || echo "true")"
-tagIgnored="$(git config --get commit-tagger.tagignored || echo "true")"
-confirm="$(git config --get commit-tagger.confirm || echo "true")"
-tagMode="$(git config --get commit-tagger.tagmode || echo "opt-out")"
+hooksEnabled="$(git config --get commit-tagger.hooksenabled || printf "true")"
+commitmsgEnabled="$(git config --get commit-tagger.commitmsgenabled || printf "true")"
+tagIgnored="$(git config --get commit-tagger.tagignored || printf "true")"
+confirm="$(git config --get commit-tagger.confirm || printf "true")"
+tagMode="$(git config --get commit-tagger.tagmode || printf "opt-out")"
 
-if [ -n "$2" -a  "$2" != "message" ]; then
+if [ -n "$2" -a "$2" != "message" ]; then
   exit 0
 fi
 
 if [ "$hooksEnabled" = "false" ]; then
   exit 0
 elif [ "$hooksEnabled" != "true" ]; then
-  printf "Invalid option found: commit-tagger.hooksenabled=$hooksEnabled. Allowed values are true (default) and false.\n" >&2
+  printf "Invalid option found: commit-tagger.hooksenabled=%s. Allowed values are true (default) and false.\n" "$hooksEnabled" >&2
   printf "Please use 'git config commit-tagger.hooksenabled true|false' to set a valid configuration.\n" >&2
   exit 1
 fi
@@ -26,7 +26,7 @@ fi
 if [ "$commitmsgEnabled" = "false" ]; then
   exit 0
 elif [ "$commitmsgEnabled" != "true" ]; then
-  printf "Invalid option found: commit-tagger.commitmsgenabled=$commitmsgEnabled. Allowed values are true (default) and false.\n" >&2
+  printf "Invalid option found: commit-tagger.commitmsgenabled=%s. Allowed values are true (default) and false.\n" "$commitmsgEnabled" >&2
   printf "Please use 'git config commit-tagger.commitmsgenabled true|false' to set a valid configuration.\n" >&2
   exit 1
 fi
@@ -35,7 +35,7 @@ function prompt {
   # $1 = message
 
   while true; do
-    printf "$1"
+    printf "%s" "$1"
     exec < /dev/tty
     read promptRes
     case "$promptRes" in
@@ -62,12 +62,12 @@ function tagMessage {
   if [ $? != 0 ]; then
     exit 1
   fi
-  printf "$str"
+  printf "%s" "$str"
   return 0
 }
 
 case "$tagMode" in
-  "opt-in" )
+  "opt-in")
     # if echo "$message" | head -1 | grep -q "^+"; then
     #   message="$(echo "$message" | sed "1 s|^+||")"
     if [ "${message:0:1}" = "+" ]; then
@@ -75,7 +75,7 @@ case "$tagMode" in
     fi
   ;;
 
-  "opt-out" )
+  "opt-out")
     # if echo "$message" | head -1 | grep -q -v "^-"; then
     if [ "${message:0:1}" != "-" ]; then
       message="$(tagMessage "$message")"
@@ -85,8 +85,8 @@ case "$tagMode" in
     fi
   ;;
 
-  * )
-    printf "Invalid option found: commit-tagger.tagmode=$tagMode. Allowed values are opt-in and opt-out (default).\n" >&2
+  *)
+    printf "Invalid option found: commit-tagger.tagmode=%s. Allowed values are opt-in and opt-out (default).\n" "$tagMode" >&2
     printf "Please use 'git config commit-tagger.tagmode opt-in|opt-out' to set a valid configuration.\n" >&2
     exit 1
   ;;
@@ -95,27 +95,27 @@ esac
 if [ "$2" = "message" ]; then
   case "$confirm" in
     "true")
-      formatMessage="$(printf "$message" | sed "s|^|  |")"
-      printf "The commit message will be the following:\n\n$formatMessage\n\n\n"
+      formatMessage="$(printf "%s" "$message" | sed "s|^|  |")"
+      printf "The commit message will be the following:\n\n%s\n\n\n" "$formatMessage"
       prompt "Do you wish to continue? [yes or no]: "
       if [ $? = 0 ]; then
-        printf "$message" > $1
+        printf "%s" "$message" > $1
         exit 0
       else
-        printf "The commit has been aborted."
+        printf "The commit has been aborted.\n"
         exit 1
       fi
     ;;
     "false")
-      printf "$message" > $1
+      printf "%s" "$message" > $1
     ;;
     *)
-      printf "Invalid option found: commit-tagger.confirm=$confirm. Allowed values are true (default) and false.\n" >&2
+      printf "Invalid option found: commit-tagger.confirm=%s. Allowed values are true (default) and false.\n" "$confirm" >&2
       printf "Please use 'git config commit-tagger.confirm true|false' to set a valid configuration.\n" >&2
       exit 1
     ;;
   esac
 else
-  printf "$message" > $1
+  printf "%s" "$message" > $1
   exit 0
 fi

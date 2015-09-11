@@ -12,9 +12,9 @@ function getParent {
   #$1 = branch
 
   local parent
-  parent="$(printf "$parents" | sed -n "s|^$1:||p" | head -1)"
+  parent="$(printf "%s" "$parents" | sed -n "s|^$1:||p" | head -1)"
   if [ -n "$parent" ]; then
-    printf "$parent"
+    printf "%s" "$parent"
     return 0
   else
     return 1
@@ -24,7 +24,7 @@ function getParent {
 function isIgnored {
   # $1 = branch
 
-  printf "$ignored" | grep -q "^$1$"
+  printf "%s" "$ignored" | grep -q "^$1$"
   return $?
 }
 
@@ -36,8 +36,8 @@ function isIgnored {
 function getTag {
   # $1 = branch
 
-  # printf "$(printf $1 | sed "s|.*\/||")"
-  printf "${1##*/}"
+  # printf "%s" "$(printf "%s" $1 | sed "s|.*\/||")"
+  printf "%s" "${1##*/}"
   return 0
 }
 
@@ -53,7 +53,7 @@ function tag {
   parentExists=$?
   tagIgnored="$(git config --get commit-tagger.tagignored || printf "true")"
   if  [ "$tagIgnored" != "true" -a "$tagIgnored" != "false" ]; then
-    printf "Invalid option found: 'commit-tagger.tagignored=$tagIgnored'. Allowed values are true (default) and false.\n" >&2
+    printf "Invalid option found: 'commit-tagger.tagignored=%s'. Allowed values are true (default) and false.\n" "$tagIgnored" >&2
     printf "Please use 'git config commit-tagger.tagignored true|false' to set a valid configuration.\n" >&2
     return 1
   fi
@@ -72,7 +72,7 @@ function tag {
         fi
       done
     fi
-    printf "$tags\n"
+    printf "%s\n" "$tags"
     return 0
   fi
 }
@@ -86,20 +86,20 @@ function get-parent {
   # $1 = branch
 
   local parent
-  parent=$(printf "$parents" | grep "^$1:" | head -1 | sed "s|^$1:||")
+  parent=$(printf "%s" "$parents" | grep "^$1:" | head -1 | sed "s|^$1:||")
   if [ -n "$parent" ]; then
-    printf "The parent of branch \e[1m$1\e[0m is \e[1m$parent\e[0m.\n"
+    printf "The parent of branch \e[1m%s\e[0m is \e[1m%s\e[0m.\n" "$1" "$parent"
     if isIgnored "$1"; then
-      printf "Branch \e[1m$1\e[0m is being ignored.\n"
+      printf "Branch \e[1m%s\e[0m is being ignored.\n" "$1"
     fi
     if isIgnored "$parent"; then
-      printf "Branch \e[1m$parent\e[0m is being ignored.\n"
+      printf "Branch \e[1m%s\e[0m is being ignored.\n" "$parent"
     fi
     return 0
   else
-    printf "Branch \e[1m$1\e[0m does not have a parent.\n"
+    printf "Branch \e[1m%s\e[0m does not have a parent.\n" "$1"
     if isIgnored "$1"; then
-      printf "Branch \e[1m$1\e[0m is being ignored.\n"
+      printf "Branch \e[1m%s\e[0m is being ignored.\n" "$1"
     fi
     return 1
   fi
@@ -118,28 +118,28 @@ function set-parent {
   parent="$2"
   counter=20
   if [ "$1" = "$2" ]; then
-    printf "Branch \e[1m$1\e[0m cannot be its own parent.\n" >&2
+    printf "Branch \e[1m%s\e[0m cannot be its own parent.\n" "$1" >&2
     return 1
   fi
   while getParent "$parent" > /dev/null; do
     parent="$(getParent "$parent")"
     counter=$(($counter - 1))
     if [ "$parent" = "$1" -o $counter -lt 0 ]; then
-      printf "The parent of branch \e[1m$1\e[0m cannot be \e[1m$2\e[0m since that would result in an infinite loop.\n" >&2
+      printf "The parent of branch \e[1m%s\e[0m cannot be \e[1m%s\e[0m since that would result in an infinite loop.\n" "$1" "$2" >&2
       return 1
     fi
   done
   if getParent "$1" > /dev/null; then
     sed "s|^$1:.*$|$1:$2|g" "$parentsFile" > "$parentsFile.new" && mv "$parentsFile.new" "$parentsFile"
   else
-    printf "$1:$2\n" >> "$parentsFile"
+    printf "%s:%s\n" "$1" "$2" >> "$parentsFile"
   fi
-  printf "The parent of branch \e[1m$1\e[0m has been set to \e[1m$2\e[0m.\n"
+  printf "The parent of branch \e[1m%s\e[0m has been set to \e[1m%s\e[0m.\n" "$1" "$2"
   if isIgnored "$1"; then
-    printf "Branch \e[1m$1\e[0m is being ignored.\n"
+    printf "Branch \e[1m%s\e[0m is being ignored.\n" "$1"
   fi
   if isIgnored "$2"; then
-    printf "Branch \e[1m$2\e[0m is being ignored.\n"
+    printf "Branch \e[1m%s\e[0m is being ignored.\n" "$2"
   fi
   return 0
 }
@@ -157,16 +157,16 @@ function remove-parent {
   if [ $? -eq 0 ]; then
     parents="$(grep -v "^$1:" "$parentsFile")"
     if [ -n "$parents" ]; then
-      printf "$parents\n" > "$parentsFile"
+      printf "%s\n" "$parents" > "$parentsFile"
     else
       printf "" > "$parentsFile"
     fi
-    printf "Branch \e[1m$1\e[0m no longer has \e[1m$parent\e[0m set as parent.\n"
+    printf "Branch \e[1m%2\e[0m no longer has \e[1m%s\e[0m set as parent.\n" "$1" "$parent"
   else
-    printf "There isn't any parent set for branch \e[1m$1\e[0m.\n"
+    printf "There isn't any parent set for branch \e[1m%s\e[0m.\n" "$1"
   fi
   if isIgnored "$1"; then
-    printf "Branch \e[1m$1\e[0m is being ignored.\n"
+    printf "Branch \e[1m%s\e[0m is being ignored.\n" "$1"
   fi
   return 0
 }
@@ -183,10 +183,10 @@ function ignore {
   for branch in "$@"; do
     if ! isIgnored "$branch"; then
       ignored="$ignored\n$branch"
-      printf "$branch\n" >> "$ignoredFile"
-      printf "Branch \e[1m$branch\e[0m is now being ignored.\n"
+      printf "%s\n" "$branch" >> "$ignoredFile"
+      printf "Branch \e[1m%s\e[0m is now being ignored.\n" "$branch"
     else
-      printf "Branch \e[1m$branch\e[0m is already being ignored.\n"
+      printf "Branch \e[1m%s\e[0m is already being ignored.\n" "$branch"
     fi
   done
   return 0
@@ -205,13 +205,13 @@ function unignore {
     if isIgnored "$branch"; then
       ignored="$(grep -v "^$branch$" "$ignoredFile")"
       if [ -n "$ignored" ]; then
-        printf "$ignored\n" > "$ignoredFile"
+        printf "%s\n" "$ignored" > "$ignoredFile"
       else
         printf "" > "$ignoredFile"
       fi
-      printf "Branch \e[1m$branch\e[0m is no longer being ignored.\n"
+      printf "Branch \e[1m%s\e[0m is no longer being ignored.\n" "$branch"
     else
-      printf "Branch \e[1m$branch\e[0m is not currently beign ignored.\n"
+      printf "Branch \e[1m%s\e[0m is not currently beign ignored.\n" "$branch"
     fi
   done
   return 0
@@ -227,16 +227,16 @@ function install-hooks {
   local file
   local fileName
   hooksDir="$(git rev-parse --git-dir)/hooks"
-  printf "Repository's Hooks directory: $hooksDir\n\n"
+  printf "Repository's Hooks directory: %s\n\n" "$hooksDir"
   for file in "$HOME"/.commit-tagger/hooks/*; do
     fileName="$(basename "$file")"
-    printf "Installing '$fileName'...\n"
+    printf "Installing '%s'...\n" "$fileName"
     if ! cp "$file" "$hooksDir"; then
-      printf "There was a problem copying '$file' to '$hooksDir'.\n" >&2
+      printf "There was a problem copying '%s' to '%s'.\n" "$file" "$hooksDir" >&2
       return 1
     fi
     if ! chmod +x "$hooksDir/$fileName"; then
-      printf "There was a problem giving execute permissions to '$hooksDir/$fileName'.\n" >&2
+      printf "There was a problem giving execute permissions to '%s/%s'.\n" "$hooksDir" "$fileName" >&2
       return 1
     fi
   done
@@ -254,12 +254,12 @@ function uninstall-hooks {
   local file
   local fileName
   hooksDir="$(git rev-parse --git-dir)/hooks"
-  printf "Repository's Hooks directory: $hooksDir\n\n"
+  printf "Repository's Hooks directory: %s\n\n" "$hooksDir"
   for file in "$HOME"/.commit-tagger/hooks/*; do
     fileName="$(basename "$file")"
-    printf "Removing '$fileName'...\n"
+    printf "Removing '%s'...\n" "$fileName"
     if ! rm "$hooksDir/$fileName"; then
-      printf "There was a problem removing '$fileName' from '$hooksDir'.\n" >&2
+      printf "There was a problem removing '%s' from '%s'.\n" "$fileName" "$hooksDir" >&2
       return 1
     fi
   done
@@ -327,10 +327,10 @@ function checkArgs {
   # $1 = min, $2 = max, $3 = argc, $4+ = argv
 
   if [ $3 -lt $1 ]; then
-    printf "Missing required arguments for command '$4'.\nPlease run 'git commit-tagger help' to see the list of available commands.\n" >&2
+    printf "Missing required arguments for command '%s'.\nPlease run 'git commit-tagger help' to see the list of available commands.\n" "$4" >&2
     exit 1
   elif [ $3 -gt $2 ]; then
-    printf "Invalid arguments: '${@:5}' for command '$4'.\nPlease run 'git commit-tagger help' to see the list of available commands.\n" >&2
+    printf "Invalid arguments: '%s' for command '%s'.\nPlease run 'git commit-tagger help' to see the list of available commands.\n" "${@:5}" "$4" >&2
     exit 1
   fi
 }
@@ -421,7 +421,7 @@ case "$1" in
 
   # invalid command
   *)
-    printf "Invalid command: '$1'.\nPlease run 'git commit-tagger help' to see the list of available commands.\n" >&2
+    printf "Invalid command: '%s'.\nPlease run 'git commit-tagger help' to see the list of available commands.\n" "$1" >&2
     exit 1
   ;;
 esac
