@@ -50,7 +50,7 @@ fi
 
 exec 0< /dev/tty 1> /dev/tty 2>&1
 
-function runCommand {
+runCommand () {
   # $1 = command, $2 = [display name]
 
   if [ "$failed" = "true" ]; then
@@ -77,7 +77,7 @@ function runCommand {
   fi
 }
 
-function stashSave {
+stashSave () {
   local prevStashRef
   prevStashRef="$(git show-ref --hash stash)"
   git stash save --keep-index --include-untracked 'commit-tagger: pre-commit files' > /dev/null 2>&1
@@ -93,7 +93,7 @@ function stashSave {
   return 0
 }
 
-function stashPop {
+stashPop () {
   if [ "$stashedChanges" != "true" ]; then
     return 0
   fi
@@ -116,7 +116,7 @@ function stashPop {
   return 0
 }
 
-function interrupt {
+interrupt () {
   exec 1> /dev/tty
   printf "\nCommit aborted.\n"
   printf "Working directory will be restored from stash.\n"

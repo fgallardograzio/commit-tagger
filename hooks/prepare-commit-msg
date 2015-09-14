@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # $1 = filename that contains the message, $2 = source of the commit message
 
@@ -33,7 +33,7 @@ fi
 
 exec 0< /dev/tty 1> /dev/tty 2>&1
 
-function prompt {
+prompt () {
   # $1 = message
 
   while true; do
@@ -50,7 +50,7 @@ function prompt {
   done
 }
 
-function tagMessage {
+tagMessage () {
   # $1 = message
 
   local str

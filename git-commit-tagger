@@ -8,7 +8,7 @@ ignoredFile="$(git rev-parse --git-dir)/commit-tagger.ignored"
 parents="$(cat "$parentsFile" 2> /dev/null)"
 ignored="$(cat "$ignoredFile" 2> /dev/null)"
 
-function getParent {
+getParent () {
   #$1 = branch
 
   local parent
@@ -21,14 +21,14 @@ function getParent {
   fi
 }
 
-function isIgnored {
+isIgnored () {
   # $1 = branch
 
   printf "%s" "$ignored" | grep -q "^$1$"
   return $?
 }
 
-function prompt {
+prompt () {
   # $1 = message
 
   while true; do
@@ -50,7 +50,7 @@ function prompt {
 
 # -------- tag --------
 
-function getTag {
+getTag () {
   # $1 = branch
 
   # printf "%s" "$(printf "%s" $1 | sed "s|.*\/||")"
@@ -58,7 +58,7 @@ function getTag {
   return 0
 }
 
-function tag {
+tag () {
   # $1 = branch
 
   local parent
@@ -99,7 +99,7 @@ function tag {
 
 # -------- get-parent --------
 
-function get-parent {
+get-parent () {
   # $1 = branch
 
   local parent
@@ -127,7 +127,7 @@ function get-parent {
 
 # -------- set-parent --------
 
-function set-parent {
+set-parent () {
   # $1 = branch, $2 = parentBranch
 
   local parent
@@ -166,7 +166,7 @@ function set-parent {
 
 # -------- remove-parent --------
 
-function remove-parent {
+remove-parent () {
   # $1 = branch
 
   local parent
@@ -193,7 +193,7 @@ function remove-parent {
 
 # -------- ignore --------
 
-function ignore {
+ignore () {
   # $@ = list of branches
 
   local branch
@@ -214,7 +214,7 @@ function ignore {
 
 # -------- unignore --------
 
-function unignore {
+unignore () {
   # $@ = list of branches
 
   local branch
@@ -239,7 +239,7 @@ function unignore {
 
 # -------- is-ignored --------
 
-function is-ignored {
+is-ignored () {
   # $1 = branch
 
   if isIgnored "$1"; then
@@ -256,7 +256,7 @@ function is-ignored {
 
 # -------- install-hooks --------
 
-function install-hooks {
+install-hooks () {
   local gitDir
   local hooksDir
   local file
@@ -317,7 +317,7 @@ function install-hooks {
 
 # -------- uninstall-hooks --------
 
-function uninstall-hooks {
+uninstall-hooks () {
   local hooksDir
   local file
   local fileName
@@ -350,7 +350,7 @@ function uninstall-hooks {
 
 # -------- usage --------
 
-function usage {
+usage () {
   cat <<"EOF"
 Usage: git commit-tagger <command> [<args>]
 
@@ -403,7 +403,7 @@ EOF
 
 # -------- main --------
 
-function checkArgs {
+checkArgs () {
   # $1 = min, $2 = max, $3 = argc, $4+ = argv
 
   if [ $3 -lt $1 ]; then

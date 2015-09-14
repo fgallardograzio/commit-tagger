@@ -2,7 +2,7 @@
 
 # $1 = [optional] installation dir
 
-function prompt {
+prompt () {
   # $1 = message
 
   while true; do
@@ -19,7 +19,7 @@ function prompt {
   done
 }
 
-function abortInstall {
+abortInstall () {
   # $1 = condition, $2 = message
 
   if [ $1 != 0 ]; then
