@@ -31,5 +31,9 @@ if [ $checkoutType -eq 1 -a "$prevHEAD" = "$newHEAD" ]; then
      ! git commit-tagger is-ignored "$currBranch" > /dev/null 2>&1 &&
      ! git commit-tagger is-ignored "$prevBranch" > /dev/null 2>&1; then
     git commit-tagger set-parent "$currBranch" "$prevBranch" 2> /dev/null
+    if [ $? != 0 ]; then
+      printf "\nError: commit-tagger cannot be found. Please re-install it or remove this hook from your repository.\n" >&2
+      printf "You can do so by deleting '%s'.\n" "$(git rev-parse --git-dir)/hooks/post-checkout" >&2
+    fi
   fi
 fi
