@@ -1,6 +1,6 @@
 #!/bin/bash
 
-installDir="$(cat "$HOME"/.commit-tagger/installation_path 2> /dev/null)"
+installDir="$(cat "$HOME/.commit-tagger/installation_path" 2> /dev/null)"
 
 function prompt {
   # $1 = message
@@ -34,17 +34,17 @@ abortUninstall $? "File '$HOME/.commit-tagger/installation_path' not found or em
 
 printf "You are about to uninstall 'commit-tagger'. The following files and folders will be permanently deleted:\n\n"
 printf "%s/git-commit-tagger\n" "$installDir"
-find "$HOME"/.commit-tagger
+find "$HOME/.commit-tagger"
 printf "\n"
 printf "Warning: If you remove commit-tagger without previously removing all of its hooks from existing repositories\n"
 printf "errors will occur and you will have to delete said files manually.\n\n"
 prompt "Do you wish to continue? [yes or no]: "
 abortUninstall $?
 
-rm "$installDir"/git-commit-tagger &> /dev/null
+rm "$installDir/git-commit-tagger" > /dev/null 2>&1
 abortUninstall $? "Cannot delete '$installDir/git-commit-tagger'."
 
-rm -R "$HOME"/.commit-tagger &> /dev/null
+rm -R "$HOME/.commit-tagger" > /dev/null 2>&1
 abortUninstall $? "An error occurred while deleting the contents of '$HOME/.commit-tagger'."
 
 printf "\nUninstallation successful.\n"

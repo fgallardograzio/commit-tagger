@@ -240,13 +240,20 @@ function unignore {
 # -------- install-hooks --------
 
 function install-hooks {
+  local gitDir
   local hooksDir
   local file
   local fileName
   local replaceFiles
-  hooksDir="$(git rev-parse --git-dir)/hooks"
+  gitDir="$(git rev-parse --git-dir)"
+  hooksDir="$gitDir/hooks"
   printf "Repository's Hooks directory: %s\n\n" "$hooksDir"
   for file in "$HOME/.commit-tagger/hooks"/*; do
+    if [ ! -e "$file" ]; then
+      printf "Directory '%s' does not exist or does not contain any files.\n" "$HOME/.commit-tagger/hooks" >&2
+      printf "Installation aborted.\n"
+      exit 1
+    fi
     fileName="$(basename "$file")";
     if [ -e "$hooksDir/$fileName" ]; then
       replaceFiles="true"
@@ -263,11 +270,6 @@ function install-hooks {
     printf "\n"
   fi
   for file in "$HOME/.commit-tagger/hooks"/*; do
-    if [ ! -e "$file" ]; then
-      printf "Directory '%s' does not exist or does not contain any files.\n" "$HOME/.commit-tagger/hooks" >&2
-      printf "Installation aborted.\n"
-      exit 1
-    fi
     fileName="$(basename "$file")"
     printf "Installing '%s'...\n" "$fileName"
     if ! cp "$file" "$hooksDir"; then
@@ -281,6 +283,14 @@ function install-hooks {
       exit 1
     fi
   done
+  if [ ! -f "$gitDir/commit-tagger.precommit" ]; then
+    printf "Importing pre-commit template.\n"
+    if ! cp "$HOME/.commit-tagger/files/commit-tagger.precommit" "$gitDir"; then
+      printf "There was a problem copying '%s' to '%s'.\n" "$HOME/.commit-tagger/files/commit-tagger.precommit" "$gitDir" >&2
+      printf "Installation aborted.\n"
+      exit 1
+    fi
+  fi
   printf "\nHooks successfully installed.\n"
   return 0
 }
@@ -358,8 +368,8 @@ Available settings:
   hooksenabled      [true|false] Enable all of commit-tagger's hooks in this repository. Default: true.
   checkoutenabled   [true|false] Enable the 'post-checkout' hook. Default true.
   commitmsgenabled  [true|false] Enable the 'prepare-commit-msg' hook to tag messages. Default true.
-  testsenabled      [true|false] Enable the 'pre-commit' hook to test the files to be commited. Default: true.
-  testsverbose      [true|false] Show the output of all the tests. Default: false.
+  precommitenabled  [true|false] Enable the 'pre-commit' hook to test the files to be commited. Default: true.
+  precommitverbose  [true|false] Show the output of all the tests. Default: false.
   tagignored        [true|false] Tag commit messages on ignored branches. Default: true.
   confirm           [true|false] Ask for confirmation before actually issuing the commit.
                     Only when -m of -F is used. Default: true

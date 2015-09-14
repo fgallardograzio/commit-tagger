@@ -1,12 +1,9 @@
 #!/bin/bash
 
-#
-# Please enter your custom pre-commit commands at the bottom of this file
-#
-
 hooksEnabled="$(git config --get commit-tagger.hooksenabled || printf "true")"
-testsEnabled="$(git config --get commit-tagger.testsenabled || printf "true")"
-testsVerbose="$(git config --get commit-tagger.testsverbose || printf "false")"
+preCommitEnabled="$(git config --get commit-tagger.precommitenabled || printf "true")"
+preCommitVerbose="$(git config --get commit-tagger.precommitverbose || printf "false")"
+commandsFile="$(git rev-parse --git-dir)/commit-tagger.precommit"
 
 if [ "$hooksEnabled" = "false" ]; then
   exit 0
@@ -17,20 +14,38 @@ elif [ "$hooksEnabled" != "true" ]; then
   exit 1
 fi
 
-if [ "$testsEnabled" = "false" ]; then
+if [ "$preCommitEnabled" = "false" ]; then
   exit 0
-elif [ "$testsEnabled" != "true" ]; then
-  printf "Invalid option found: commit-tagger.testsenabled=%s. Allowed values are true (default) and false.\n" "$testsEnabled" >&2
-  printf "Please use 'git config commit-tagger.testsenabled true|false' to set a valid configuration.\n" >&2
+elif [ "$preCommitEnabled" != "true" ]; then
+  printf "Invalid option found: commit-tagger.precommitenabled=%s. Allowed values are true (default) and false.\n" "$preCommitEnabled" >&2
+  printf "Please use 'git config commit-tagger.precommitenabled true|false' to set a valid configuration.\n" >&2
   printf "Commit aborted.\n"
   exit 1
 fi
 
-if [ "$testsVerbose" != "true" -a "$testsVerbose" != "false" ]; then
-  printf "Invalid option found: commit-tagger.testsverbose=%s. Allowed values are true and false (default).\n" "$testsVerbose" >&2
-  printf "Please use 'git config commit-tagger.testsverbose true|false' to set a valid configuration.\n" >&2
+if [ "$preCommitVerbose" != "true" -a "$preCommitVerbose" != "false" ]; then
+  printf "Invalid option found: commit-tagger.precommitverbose=%s. Allowed values are true and false (default).\n" "$preCommitVerbose" >&2
+  printf "Please use 'git config commit-tagger.precommitverbose true|false' to set a valid configuration.\n" >&2
   printf "Commit aborted.\n"
   exit 1
+fi
+
+if [ ! -f "$commandsFile" ]; then
+  printf "File '%s' not found.\n" "$commandsFile"
+  printf "Importing template from '%s'.\n" "$HOME/.commit-tagger/files/commit-tagger.precommit"
+  if [ -f "$HOME/.commit-tagger/files/commit-tagger.precommit" ]; then
+    cp "$HOME/.commit-tagger/files/commit-tagger.precommit" "$commandsFile"
+    if [ $? != 0 ]; then
+      printf "There was a problem copying '%s' to '%s'.\n" "$HOME/.commit-tagger/files/commit-tagger.precommit" "$commandsFile" >&2
+      printf "Commit aborted.\n"
+      exit 1
+    fi
+  else
+    printf "File '%s' not found.\n" "$HOME/.commit-tagger/files/commit-tagger.precommit" >&2
+    printf "Please make sure commit-tagger is correctly installed in your system.\n" >&2
+    printf "Commit aborted.\n"
+    exit 1
+  fi
 fi
 
 exec 0< /dev/tty 1> /dev/tty 2>&1
@@ -47,7 +62,7 @@ function runCommand {
     displayName="$1"
   fi
   printf "Starting '\e[1m%s\e[0m'...\n" "$displayName"
-  if [ "$testsVerbose" = "true" ]; then
+  if [ "$preCommitVerbose" = "true" ]; then
     eval "$1"
   else
     eval "$1" > /dev/null 2>&1
@@ -65,7 +80,7 @@ function runCommand {
 function stashSave {
   local prevStashRef
   prevStashRef="$(git show-ref --hash stash)"
-  git stash save --keep-index --include-untracked 'commit-tagger: pre-commit test - unstaged files' > /dev/null 2>&1
+  git stash save --keep-index --include-untracked 'commit-tagger: pre-commit files' > /dev/null 2>&1
   if [ $? != 0 ]; then
     printf "An error occurred while trying to save the working directory to a new stash and remove unstaged files.\n" >&2
     printf "Commit aborted.\n"
@@ -102,6 +117,7 @@ function stashPop {
 }
 
 function interrupt {
+  exec 1> /dev/tty
   printf "\nCommit aborted.\n"
   printf "Working directory will be restored from stash.\n"
   exec 1> /dev/null
@@ -109,37 +125,10 @@ function interrupt {
   kill -INT $$
 }
 
-
 stashSave
 trap "stashPop" EXIT
 trap "interrupt" INT
 
-
-# Run your commands here!
-# Syntax: runCommand "<command>" ["<displayName>"]
-# if <displayName> is omitted, <command> will be shown instead.
-#
-# Example:
-#
-# runCommand "gulp build:prod" "production build"
-# runCommand "gulp jscs"
-#
-# This will output something like:
-#   Starting 'production build'...
-#   < command output >
-#   Finished 'production build' successfully.
-#   Starting 'gulp jscs'
-#   < command output >
-#   Failed: 'gulp jscs'
-#   Commit aborted.
-#
-# Remember you can use 'git config commit-tagger.testsverbose true|false'
-# to show or hide commands output.
-#
-# Please be careful not to omit 'runCommand'.
-
-printf "  You can run your own commands and tests in here.\n"
-printf "  Only changes in the index will be taken into account.\n"
-printf "  Unstaged files will be stashed and automatically restored later.\n"
+. "$commandsFile"
 
 exit 0
