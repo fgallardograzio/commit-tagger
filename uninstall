@@ -1,6 +1,6 @@
 #!/bin/bash
 
-installDir="$(cat "$HOME"/.commit-tagger/installation_path  2> /dev/null)"
+installDir="$(cat "$HOME"/.commit-tagger/installation_path 2> /dev/null)"
 
 function prompt {
   # $1 = message
@@ -11,10 +11,10 @@ function prompt {
     case "$promptRes" in
       [yY]|[yY][eE][sS])
         return 0
-        ;;
+      ;;
       [nN]|[nN][oO])
         return 1
-        ;;
+      ;;
     esac
   done
 }

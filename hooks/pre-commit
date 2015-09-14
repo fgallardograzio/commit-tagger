@@ -1,5 +1,9 @@
 #!/bin/bash
 
+#
+# Please enter your custom pre-commit commands at the bottom of this file
+#
+
 hooksEnabled="$(git config --get commit-tagger.hooksenabled || printf "true")"
 testsEnabled="$(git config --get commit-tagger.testsenabled || printf "true")"
 testsVerbose="$(git config --get commit-tagger.testsverbose || printf "false")"
@@ -9,6 +13,7 @@ if [ "$hooksEnabled" = "false" ]; then
 elif [ "$hooksEnabled" != "true" ]; then
   printf "Invalid option found: commit-tagger.hooksenabled=%s. Allowed values are true (default) and false.\n" "$hooksEnabled" >&2
   printf "Please use 'git config commit-tagger.hooksenabled true|false' to set a valid configuration.\n" >&2
+  printf "Commit aborted.\n"
   exit 1
 fi
 
@@ -17,66 +22,124 @@ if [ "$testsEnabled" = "false" ]; then
 elif [ "$testsEnabled" != "true" ]; then
   printf "Invalid option found: commit-tagger.testsenabled=%s. Allowed values are true (default) and false.\n" "$testsEnabled" >&2
   printf "Please use 'git config commit-tagger.testsenabled true|false' to set a valid configuration.\n" >&2
+  printf "Commit aborted.\n"
   exit 1
 fi
 
 if [ "$testsVerbose" != "true" -a "$testsVerbose" != "false" ]; then
   printf "Invalid option found: commit-tagger.testsverbose=%s. Allowed values are true and false (default).\n" "$testsVerbose" >&2
   printf "Please use 'git config commit-tagger.testsverbose true|false' to set a valid configuration.\n" >&2
+  printf "Commit aborted.\n"
   exit 1
 fi
 
+exec 0< /dev/tty 1> /dev/tty 2>&1
+
 function runCommand {
-  # $@ = command
+  # $1 = command, $2 = [display name]
 
   if [ "$failed" = "true" ]; then
     return 1
   fi
-  printf "Running: %s\n" "$*"
-  if [ "$testsVerbose" = "true" ]; then
-    $@
+  if [ -n "$2" ]; then
+    displayName="$2"
   else
-    $@ > /dev/null 2>&1
+    displayName="$1"
+  fi
+  printf "Starting '\e[1m%s\e[0m'...\n" "$displayName"
+  if [ "$testsVerbose" = "true" ]; then
+    eval "$1"
+  else
+    eval "$1" > /dev/null 2>&1
   fi
   if [ $? = 0 ]; then
-    printf "Success: %s\n" "$*"
+    printf "Finished '\e[1m%s\e[0m' successfully.\n" "$displayName"
     return 0
   else
-    printf "Failed: %s\n" "$*"
-    failed="true"
-    return 1
+    printf "Failed: '\e[1m%s\e[0m'.\n" "$displayName"
+    printf "Commit aborted.\n"
+    exit 1
   fi
 }
 
-# Let's keep in our working directory only the staged files
-printf "Stashing unstaged files.\n\n"
-git stash save --keep-index --include-untracked --quiet 'commit-tagger: pre-commit test - unstaged files'
-if [ $? != 0 ]; then
-  printf "An error occurred while trying to save the working directory to a new stash.\n"
-  printf "Commit aborted.\n"
-  exit 1
-fi
+function stashSave {
+  local prevStashRef
+  prevStashRef="$(git show-ref --hash stash)"
+  git stash save --keep-index --include-untracked 'commit-tagger: pre-commit test - unstaged files' > /dev/null 2>&1
+  if [ $? != 0 ]; then
+    printf "An error occurred while trying to save the working directory to a new stash and remove unstaged files.\n" >&2
+    printf "Commit aborted.\n"
+    exit 1
+  fi
+  if [ "$(git show-ref --hash stash)" != "$prevStashRef" ]; then
+    stashedChanges="true"
+    printf "Stashed unstaged files.\n\n"
+  fi
+  return 0
+}
 
-# trap cleanup EXIT
-# TODO: can't bash traps work in a hook?
+function stashPop {
+  if [ "$stashedChanges" != "true" ]; then
+    return 0
+  fi
+  git reset --hard HEAD > /dev/null 2>&1
+  if [ $? != 0 ]; then
+    printf "An error occurred while trying to reset the working directory.\n" >&2
+    printf "Please check 'git stash list' and run 'git reset --hard HEAD' and 'git stash pop' yourself.\n" >&2
+    printf "Commit aborted.\n"
+    exit 1
+  fi
+  git stash pop --index > /dev/null 2>&1
+  if [ $? != 0 ]; then
+    printf "An error occurred while trying to restore the working directory from the saved stash.\n" >&2
+    printf "Please check 'git stash list' and run 'git stash pop' yourself.\n" >&2
+    printf "Commit aborted.\n"
+    exit 1
+  fi
+  stashedChanges="false"
+  printf "\nRestored working directory from stash.\n"
+  return 0
+}
 
-# Run your tests here!
-# runCommand gulp build:prod
- runCommand test -n "hola"
+function interrupt {
+  printf "\nCommit aborted.\n"
+  printf "Working directory will be restored from stash.\n"
+  exec 1> /dev/null
+  trap - INT
+  kill -INT $$
+}
 
-# Restore working directory
-printf "\nRestoring working directory from stash.\n"
-git stash pop --quiet
-if [ $? != 0 ]; then
-  printf "An error occurred while trying to restore the working directory from the saved stash.\n"
-  printf "Please try to run 'git stash pop' yourself.\n"
-  printf "Commit aborted.\n"
-  exit 1
-fi
 
-if [ "$failed" = "true" ]; then
-  printf "Commit aborted.\n"
-  exit 1
-else
-  exit 0
-fi
+stashSave
+trap "stashPop" EXIT
+trap "interrupt" INT
+
+
+# Run your commands here!
+# Syntax: runCommand "<command>" ["<displayName>"]
+# if <displayName> is omitted, <command> will be shown instead.
+#
+# Example:
+#
+# runCommand "gulp build:prod" "production build"
+# runCommand "gulp jscs"
+#
+# This will output something like:
+#   Starting 'production build'...
+#   < command output >
+#   Finished 'production build' successfully.
+#   Starting 'gulp jscs'
+#   < command output >
+#   Failed: 'gulp jscs'
+#   Commit aborted.
+#
+# Remember you can use 'git config commit-tagger.testsverbose true|false'
+# to show or hide commands output.
+#
+# Please be careful not to omit 'runCommand'.
+
+printf "  You can run your own commands and tests in here.\n"
+printf "  Only changes in the index will be taken into account.\n"
+printf "  Unstaged files will be stashed and automatically restored later.\n"
+
+exit 0

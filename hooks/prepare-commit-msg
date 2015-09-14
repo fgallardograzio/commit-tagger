@@ -31,12 +31,13 @@ elif [ "$commitmsgEnabled" != "true" ]; then
   exit 1
 fi
 
+exec 0< /dev/tty 1> /dev/tty 2>&1
+
 function prompt {
   # $1 = message
 
   while true; do
     printf "%s" "$1"
-    exec < /dev/tty
     read -r promptRes
     case "$promptRes" in
       [yY]|[yY][eE][sS])

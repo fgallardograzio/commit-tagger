@@ -11,10 +11,10 @@ function prompt {
     case "$promptRes" in
       [yY]|[yY][eE][sS])
         return 0
-        ;;
+      ;;
       [nN]|[nN][oO])
         return 1
-        ;;
+      ;;
     esac
   done
 }

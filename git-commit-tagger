@@ -28,6 +28,23 @@ function isIgnored {
   return $?
 }
 
+function prompt {
+  # $1 = message
+
+  while true; do
+    printf "%s" "$1"
+    read -r promptRes
+    case "$promptRes" in
+      [yY]|[yY][eE][sS])
+        return 0
+      ;;
+      [nN]|[nN][oO])
+        return 1
+      ;;
+    esac
+  done
+}
+
 # -------- /general --------
 
 
@@ -226,22 +243,42 @@ function install-hooks {
   local hooksDir
   local file
   local fileName
+  local replaceFiles
   hooksDir="$(git rev-parse --git-dir)/hooks"
   printf "Repository's Hooks directory: %s\n\n" "$hooksDir"
-  for file in "$HOME"/.commit-tagger/hooks/*; do
+  for file in "$HOME/.commit-tagger/hooks"/*; do
+    fileName="$(basename "$file")";
+    if [ -e "$hooksDir/$fileName" ]; then
+      replaceFiles="true"
+      printf "File '%s/%s' already exists.\n" "$hooksDir" "$fileName"
+    fi
+  done
+  if [ "$replaceFiles" = "true" ]; then
+    printf "\nIf you continue those files will be replaced.\n"
+    prompt "Do you wish to continue? [yes or no]: "
+    if [ $? != 0 ]; then
+      printf "\nInstallation aborted.\n"
+      exit 1
+    fi
+    printf "\n"
+  fi
+  for file in "$HOME/.commit-tagger/hooks"/*; do
     if [ ! -e "$file" ]; then
-      printf "Directory '%s' does not exist or does not contain any files.\nInstallation aborted.\n" "$HOME/.commit-tagger/hooks"
+      printf "Directory '%s' does not exist or does not contain any files.\n" "$HOME/.commit-tagger/hooks" >&2
+      printf "Installation aborted.\n"
       exit 1
     fi
     fileName="$(basename "$file")"
     printf "Installing '%s'...\n" "$fileName"
     if ! cp "$file" "$hooksDir"; then
       printf "There was a problem copying '%s' to '%s'.\n" "$file" "$hooksDir" >&2
-      return 1
+      printf "Installation aborted.\n"
+      exit 1
     fi
     if ! chmod +x "$hooksDir/$fileName"; then
       printf "There was a problem giving execute permissions to '%s/%s'.\n" "$hooksDir" "$fileName" >&2
-      return 1
+      printf "Installation aborted.\n"
+      exit 1
     fi
   done
   printf "\nHooks successfully installed.\n"
@@ -259,16 +296,22 @@ function uninstall-hooks {
   local fileName
   hooksDir="$(git rev-parse --git-dir)/hooks"
   printf "Repository's Hooks directory: %s\n\n" "$hooksDir"
-  for file in "$HOME"/.commit-tagger/hooks/*; do
+  for file in "$HOME/.commit-tagger/hooks"/*; do
     if [ ! -e "$file" ]; then
-      printf "Directory '%s' does not exist or does not contain any files.\nInstallation aborted.\n" "$HOME/.commit-tagger/hooks"
+      printf "Directory '%s' does not exist or does not contain any files.\n" "$HOME/.commit-tagger/hooks" >&2
+      printf "Installation aborted.\n"
       exit 1
     fi
     fileName="$(basename "$file")"
+    if [ ! -e "$hooksDir/$fileName" ]; then
+      printf "File '%s' not found.\n" "$hooksDir/$fileName" >&2
+      continue
+    fi
     printf "Removing '%s'...\n" "$fileName"
     if ! rm "$hooksDir/$fileName"; then
       printf "There was a problem removing '%s' from '%s'.\n" "$fileName" "$hooksDir" >&2
-      return 1
+      printf "Installation aborted.\n"
+      exit 1
     fi
   done
   printf "\nHooks successfully uninstalled.\n"
@@ -335,10 +378,12 @@ function checkArgs {
   # $1 = min, $2 = max, $3 = argc, $4+ = argv
 
   if [ $3 -lt $1 ]; then
-    printf "Missing required arguments for command '%s'.\nPlease run 'git commit-tagger help' to see the list of available commands.\n" "$4" >&2
+    printf "Missing required arguments for command '%s'.\n" "$4" >&2
+    printf "Please run 'git commit-tagger help' to see the list of available commands.\n" >&2
     exit 1
   elif [ $3 -gt $2 ]; then
-    printf "Invalid arguments: '%s' for command '%s'.\nPlease run 'git commit-tagger help' to see the list of available commands.\n" "${@:5}" "$4" >&2
+    printf "Invalid arguments: '%s' for command '%s'.\n" "${@:5}" "$4" >&2
+    printf "Please run 'git commit-tagger help' to see the list of available commands.\n" >&2
     exit 1
   fi
 }
@@ -429,7 +474,8 @@ case "$1" in
 
   # invalid command
   *)
-    printf "Invalid command: '%s'.\nPlease run 'git commit-tagger help' to see the list of available commands.\n" "$1" >&2
+    printf "Invalid command: '%s'.\n" "$1" >&2
+    printf "Please run 'git commit-tagger help' to see the list of available commands.\n" >&2
     exit 1
   ;;
 esac
