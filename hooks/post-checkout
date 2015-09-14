@@ -1,24 +1,35 @@
 #!/bin/bash
 
+# $1 = previous head ref, $2 = new head ref, $3 = checkout type (changing branches: 1, file checkout: 0)
+
 prevHEAD="$1"
 newHEAD="$2"
 checkoutType="$3"
-getParent="$(git rev-parse --git-dir)/get-branch-parent"
-setParent="$(git rev-parse --git-dir)/set-branch-parent"
-hookEnabled="$(git config --get commit-tagger.enabled || echo "true")"
+hooksEnabled="$(git config --get commit-tagger.hooksenabled || printf "true")"
+checkoutEnabled="$(git config --get commit-tagger.checkoutenabled || printf "true")"
 
-if [ "$hookEnabled" = "false" ]; then
+if [ "$hooksEnabled" = "false" ]; then
   exit 0
-elif [ "$hookEnabled" != "true" ]; then
-  echo -e "Invalid option found: commit-tagger.enabled=$hookEnabled. Allowed values are true (default) and false.\nPlease use 'git config commit-tagger.enabled true|false' to set a valid configuration."
+elif [ "$hooksEnabled" != "true" ]; then
+  printf "Invalid option found: commit-tagger.hooksenabled=$hooksEnabled. Allowed values are true (default) and false.\n" >&2
+  printf "Please use 'git config commit-tagger.hooksenabled true|false' to set a valid configuration.\n" >&2
+  exit 1
+fi
+
+if [ "$checkoutEnabled" = "false" ]; then
+  exit 0
+elif [ "$checkoutEnabled" != "true" ]; then
+  printf "Invalid option found: commit-tagger.hooksenabled=$checkoutEnabled. Allowed values are true (default) and false.\n" >&2
+  printf "Please use 'git config commit-tagger.hooksenabled true|false' to set a valid configuration.\n" >&2
   exit 1
 fi
 
 if [ $checkoutType -eq 1 -a "$prevHEAD" = "$newHEAD" ]; then
-  previousBranch="$(git reflog -n 1 | sed "s|^.*moving from \([^ ]\+\) to \([^ ]\+\)$|\1|")"
-  currentBranch="$(git reflog -n 1 | sed "s|^.*moving from \([^ ]\+\) to \([^ ]\+\)$|\2|")"
-
-  if ! "$getParent" "$currentBranch" > /dev/null; then
-    "$setParent" "$currentBranch" "$previousBranch" 2> /dev/null
+  prevBranch="$(git reflog -n 1 | sed "s|^.*moving from \([^ ]\+\) to \([^ ]\+\)$|\1|")"
+  currBranch="$(git reflog -n 1 | sed "s|^.*moving from \([^ ]\+\) to \([^ ]\+\)$|\2|")"
+  if ! git commit-tagger get-parent "$currBranch" > /dev/null 2>&1 &&
+     ! git commit-tagger is-ignored "$currBranch" > /dev/null 2>&1 &&
+     ! git commit-tagger is-ignored "$prevBranch" > /dev/null 2>&1; then
+    git commit-tagger set-parent "$currBranch" "$prevBranch" 2> /dev/null
   fi
 fi

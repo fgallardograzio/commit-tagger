@@ -1,6 +1,6 @@
 #!/bin/sh
 
-#$1 = filename that contains the message, $2 = source of the commit message
+# $1 = filename that contains the message, $2 = source of the commit message
 
 message="$(cat $1)"
 branch="$(git rev-parse --abbrev-ref HEAD)"
