@@ -58,7 +58,7 @@ getTag () {
   return 0
 }
 
-tag () {
+ctTag () {
   # $1 = branch
 
   local parent
@@ -99,12 +99,12 @@ tag () {
 
 # -------- get-parent --------
 
-get-parent () {
+ctGetParent () {
   # $1 = branch
 
   local parent
-  parent=$(printf "%s" "$parents" | grep "^$1:" | head -1 | sed "s|^$1:||")
-  if [ -n "$parent" ]; then
+  parent=$(getParent "$1")
+  if [ $? = 0 ]; then
     printf "The parent of branch \e[1m%s\e[0m is \e[1m%s\e[0m.\n" "$1" "$parent"
     if isIgnored "$1"; then
       printf "Branch \e[1m%s\e[0m is being ignored.\n" "$1"
@@ -127,7 +127,7 @@ get-parent () {
 
 # -------- set-parent --------
 
-set-parent () {
+ctSetParent () {
   # $1 = branch, $2 = parentBranch
 
   local parent
@@ -166,7 +166,7 @@ set-parent () {
 
 # -------- remove-parent --------
 
-remove-parent () {
+ctRemoveParent () {
   # $1 = branch
 
   local parent
@@ -193,7 +193,7 @@ remove-parent () {
 
 # -------- ignore --------
 
-ignore () {
+ctIgnore () {
   # $@ = list of branches
 
   local branch
@@ -214,7 +214,7 @@ ignore () {
 
 # -------- unignore --------
 
-unignore () {
+ctUnignore () {
   # $@ = list of branches
 
   local branch
@@ -239,7 +239,7 @@ unignore () {
 
 # -------- is-ignored --------
 
-is-ignored () {
+ctIsIgnored () {
   # $1 = branch
 
   if isIgnored "$1"; then
@@ -256,7 +256,7 @@ is-ignored () {
 
 # -------- install-hooks --------
 
-install-hooks () {
+ctInstallHooks () {
   local gitDir
   local hooksDir
   local file
@@ -317,7 +317,7 @@ install-hooks () {
 
 # -------- uninstall-hooks --------
 
-uninstall-hooks () {
+ctUninstallHooks () {
   local hooksDir
   local file
   local fileName
@@ -350,7 +350,7 @@ uninstall-hooks () {
 
 # -------- usage --------
 
-usage () {
+ctUsage () {
   cat <<"EOF"
 Usage: git commit-tagger <command> [<args>]
 
@@ -423,9 +423,9 @@ case "$1" in
     checkArgs 1 2 $# $@
     # "${2:-"$(git rev-parse --abbrev-ref HEAD)"}"
     if [ -n "$2" ]; then
-      tag "$2"
+      ctTag "$2"
     else
-      tag "$(git rev-parse --abbrev-ref HEAD)"
+      ctTag "$(git rev-parse --abbrev-ref HEAD)"
     fi
   ;;
 
@@ -433,9 +433,9 @@ case "$1" in
   "get-parent")
     checkArgs 1 2 $# $@
     if [ -n "$2" ]; then
-      get-parent "$2"
+      ctGetParent "$2"
     else
-      get-parent "$(git rev-parse --abbrev-ref HEAD)"
+      ctGetParent "$(git rev-parse --abbrev-ref HEAD)"
     fi
   ;;
 
@@ -443,9 +443,9 @@ case "$1" in
   "set-parent")
     checkArgs 2 3 $# $@
     if [ -n "$3" ]; then
-      set-parent "$2" "$3"
+      ctSetParent "$2" "$3"
     else
-      set-parent "$(git rev-parse --abbrev-ref HEAD)" "$2"
+      ctSetParent "$(git rev-parse --abbrev-ref HEAD)" "$2"
     fi
   ;;
 
@@ -453,27 +453,27 @@ case "$1" in
   "remove-parent")
     checkArgs 1 2 $# $@
     if [ -n "$2" ]; then
-      remove-parent "$2"
+      ctRemoveParent "$2"
     else
-      remove-parent "$(git rev-parse --abbrev-ref HEAD)"
+      ctRemoveParent "$(git rev-parse --abbrev-ref HEAD)"
     fi
   ;;
 
   # ignore [<branch> [<branch> ...]]
   "ignore")
     if [ -n "$2" ]; then
-      ignore "${@:2}"
+      ctIgnore "${@:2}"
     else
-      ignore "$(git rev-parse --abbrev-ref HEAD)"
+      ctIgnore "$(git rev-parse --abbrev-ref HEAD)"
     fi
   ;;
 
   # unignore [<branch> [<branch> ...]]
   "unignore")
     if [ -n "$2" ]; then
-      unignore "${@:2}"
+      ctUnignore "${@:2}"
     else
-      unignore "$(git rev-parse --abbrev-ref HEAD)"
+      ctUnignore "$(git rev-parse --abbrev-ref HEAD)"
     fi
   ;;
 
@@ -481,33 +481,33 @@ case "$1" in
   "is-ignored")
     checkArgs 1 2 $# $@
     if [ -n "$2" ]; then
-      is-ignored "$2"
+      ctIsIgnored "$2"
     else
-      is-ignored "$(git rev-parse --abbrev-ref HEAD)"
+      ctIsIgnored "$(git rev-parse --abbrev-ref HEAD)"
     fi
   ;;
 
   # install-hooks
   "install-hooks")
     checkArgs 1 1 $# $@
-    install-hooks
+    ctInstallHooks
   ;;
 
   # uninstall-hooks
   "uninstall-hooks")
     checkArgs 1 1 $# $@
-    uninstall-hooks
+    ctUninstallHooks
   ;;
 
   # help
   "help")
     checkArgs 1 1 $# $@
-    usage
+    ctUsage
   ;;
 
   # no command provided
   "")
-    usage
+    ctUsage
     exit 1
   ;;
 

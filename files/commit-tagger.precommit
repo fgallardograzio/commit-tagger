@@ -20,9 +20,9 @@
 #   Commit aborted.
 #
 # Remember you can use 'git config commit-tagger.precommitverbose true|false'
-# to show or hide commands output.
+# to show or hide your commands' output.
 #
-# Please be careful not to omit 'runCommand'.
+# Please be careful not to omit 'runCommand' and write the command between quotation marks.
 
 
 # You can safely remove the following 'printf's:

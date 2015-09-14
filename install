@@ -36,11 +36,11 @@ if [ -n "$1" ]; then
   installDir="${1%%/}"
 else
   installDir="$HOME/bin"
-  installDefault=true
+  installDefault="true"
 fi
 
 if [ ! -d "$installDir" ]; then
-  if [ "$installDefault" != true ]; then
+  if [ "$installDefault" != "true" ]; then
     prompt "Directory '$installDir' does not exist. Do you wish to create it? [yes or no]: "
     abortInstall $?
   fi
