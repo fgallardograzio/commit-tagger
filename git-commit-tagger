@@ -3,6 +3,11 @@
 
 # -------- general --------
 
+if ! git rev-parse --git-dir > /dev/null 2>&1; then
+  printf "Error: Current directory (or any of the parent directories) is not a git repository.\n"
+  exit 1
+fi
+
 parentsFile="$(git rev-parse --git-dir)/commit-tagger.parents"
 ignoredFile="$(git rev-parse --git-dir)/commit-tagger.ignored"
 parents="$(cat "$parentsFile" 2> /dev/null)"
@@ -68,10 +73,10 @@ ctTag () {
   local tagIgnored
   parent="$(getParent "$1")"
   parentExists=$?
-  tagIgnored="$(git config --get commit-tagger.tagignored || printf "true")"
+  tagIgnored="$(git config --get commit-tagger.tagIgnored || printf "true")"
   if  [ "$tagIgnored" != "true" -a "$tagIgnored" != "false" ]; then
-    printf "Invalid option found: 'commit-tagger.tagignored=%s'. Allowed values are true (default) and false.\n" "$tagIgnored" >&2
-    printf "Please use 'git config commit-tagger.tagignored true|false' to set a valid configuration.\n" >&2
+    printf "Invalid option found: 'commit-tagger.tagIgnored=%s'. Allowed values are true (default) and false.\n" "$tagIgnored" >&2
+    printf "Please use 'git config commit-tagger.tagIgnored true|false' to set a valid configuration.\n" >&2
     return 1
   fi
   if ! isIgnored $1 || [ "$tagIgnored" = "true" ]; then
@@ -384,17 +389,17 @@ Configuration:
   git config commit-tagger.<setting> <value>
 
 Available settings:
-  hooksenabled      [true|false] Enable all of commit-tagger's hooks in this repository. Default: true.
-  checkoutenabled   [true|false] Enable the 'post-checkout' hook. Default true.
-  commitmsgenabled  [true|false] Enable the 'prepare-commit-msg' hook to tag messages. Default true.
-  precommitenabled  [true|false] Enable the 'pre-commit' hook to test the files to be commited. Default: true.
-  precommitverbose  [true|false] Show the output of all the tests. Default: false.
-  tagignored        [true|false] Tag commit messages on ignored branches. Default: true.
-  confirm           [true|false] Ask for confirmation before actually issuing the commit.
-                    Only when -m of -F is used. Default: true
-  tagMode           [opt-in|opt-out] Default: opt-out.
-                    opt-in: Do not tag commit messages unless prefixed with a "+" symbol.
-                    opt-out: Tag all commit messages automatically unless prefixed with a "-" symbol.
+  hooksEnabled      (true|false) Enable all commit-tagger's hooks in this repository. Default: true.
+  checkoutEnabled   (true|false) Enable the 'post-checkout' hook. Default true.
+  commitMsgEnabled  (true|false) Enable the 'prepare-commit-msg' hook to tag messages. Default true.
+  preCommitEnabled  (true|false) Enable the 'pre-commit' hook to run custom commands. Default: true.
+  preCommitVerbose  (true|false) Show the output of all the tests. Default: false.
+  tagIgnored        (true|false) Tag commit messages on ignored branches. Default: true.
+  confirm           (true|false) Ask for confirmation before actually issuing the commit.
+                    Only when -m or -F is used. Default: true.
+  tagMode           (opt-in|opt-out) Default: opt-out.
+                    opt-in: Do not tag commit messages unless prefixed with a "+".
+                    opt-out: Tag all commit messages automatically unless prefixed with a "-".
 EOF
 }
 
@@ -406,15 +411,29 @@ EOF
 checkArgs () {
   # $1 = min, $2 = max, $3 = argc, $4+ = argv
 
-  if [ $3 -lt $1 ]; then
-    printf "Missing required arguments for command '%s'.\n" "$4" >&2
+  local min
+  local max
+  local argc
+  local comm
+  local args
+  min="$1"
+  max="$2"
+  argc="$3"
+  comm="$4"
+  shift 4
+  args="$@"
+  if [ "$argc" -lt "$min" ]; then
+    printf "Missing required arguments for command '%s'.\n" "$comm" >&2
     printf "Please run 'git commit-tagger help' to see the list of available commands.\n" >&2
     exit 1
-  elif [ $3 -gt $2 ]; then
-    printf "Invalid arguments: '%s' for command '%s'.\n" "${@:5}" "$4" >&2
+  elif [ "$argc" -gt "$max" ]; then
+    printf "Invalid arguments: '%s' for command '%s'.\n" "$args" "$comm" >&2
     printf "Please run 'git commit-tagger help' to see the list of available commands.\n" >&2
     exit 1
   fi
+
+  # bash only:
+  # ${@:5} = shift 4; $@
 }
 
 case "$1" in
@@ -518,5 +537,7 @@ case "$1" in
     exit 1
   ;;
 esac
+
+exit $?
 
 # -------- /main --------

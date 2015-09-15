@@ -1,15 +1,15 @@
 #!/bin/bash
 
-hooksEnabled="$(git config --get commit-tagger.hooksenabled || printf "true")"
-preCommitEnabled="$(git config --get commit-tagger.precommitenabled || printf "true")"
-preCommitVerbose="$(git config --get commit-tagger.precommitverbose || printf "false")"
+hooksEnabled="$(git config --get commit-tagger.hooksEnabled || printf "true")"
+preCommitEnabled="$(git config --get commit-tagger.preCommitEnabled || printf "true")"
+preCommitVerbose="$(git config --get commit-tagger.preCommitVerbose || printf "false")"
 commandsFile="$(git rev-parse --git-dir)/commit-tagger.precommit"
 
 if [ "$hooksEnabled" = "false" ]; then
   exit 0
 elif [ "$hooksEnabled" != "true" ]; then
-  printf "Invalid option found: commit-tagger.hooksenabled=%s. Allowed values are true (default) and false.\n" "$hooksEnabled" >&2
-  printf "Please use 'git config commit-tagger.hooksenabled true|false' to set a valid configuration.\n" >&2
+  printf "Invalid option found: commit-tagger.hooksEnabled=%s. Allowed values are true (default) and false.\n" "$hooksEnabled" >&2
+  printf "Please use 'git config commit-tagger.hooksEnabled true|false' to set a valid configuration.\n" >&2
   printf "Commit aborted.\n"
   exit 1
 fi
@@ -17,15 +17,15 @@ fi
 if [ "$preCommitEnabled" = "false" ]; then
   exit 0
 elif [ "$preCommitEnabled" != "true" ]; then
-  printf "Invalid option found: commit-tagger.precommitenabled=%s. Allowed values are true (default) and false.\n" "$preCommitEnabled" >&2
-  printf "Please use 'git config commit-tagger.precommitenabled true|false' to set a valid configuration.\n" >&2
+  printf "Invalid option found: commit-tagger.preCommitEnabled=%s. Allowed values are true (default) and false.\n" "$preCommitEnabled" >&2
+  printf "Please use 'git config commit-tagger.preCommitEnabled true|false' to set a valid configuration.\n" >&2
   printf "Commit aborted.\n"
   exit 1
 fi
 
 if [ "$preCommitVerbose" != "true" -a "$preCommitVerbose" != "false" ]; then
-  printf "Invalid option found: commit-tagger.precommitverbose=%s. Allowed values are true and false (default).\n" "$preCommitVerbose" >&2
-  printf "Please use 'git config commit-tagger.precommitverbose true|false' to set a valid configuration.\n" >&2
+  printf "Invalid option found: commit-tagger.preCommitVerbose=%s. Allowed values are true and false (default).\n" "$preCommitVerbose" >&2
+  printf "Please use 'git config commit-tagger.preCommitVerbose true|false' to set a valid configuration.\n" >&2
   printf "Commit aborted.\n"
   exit 1
 fi

@@ -5,11 +5,10 @@
 message="$(cat $1)"
 branch="$(git rev-parse --abbrev-ref HEAD)"
 
-hooksEnabled="$(git config --get commit-tagger.hooksenabled || printf "true")"
-commitmsgEnabled="$(git config --get commit-tagger.commitmsgenabled || printf "true")"
-tagIgnored="$(git config --get commit-tagger.tagignored || printf "true")"
+hooksEnabled="$(git config --get commit-tagger.hooksEnabled || printf "true")"
+commitmsgEnabled="$(git config --get commit-tagger.commitMsgEnabled || printf "true")"
 confirm="$(git config --get commit-tagger.confirm || printf "true")"
-tagMode="$(git config --get commit-tagger.tagmode || printf "opt-out")"
+tagMode="$(git config --get commit-tagger.tagMode || printf "opt-out")"
 
 if [ -n "$2" -a "$2" != "message" ]; then
   exit 0
@@ -18,16 +17,16 @@ fi
 if [ "$hooksEnabled" = "false" ]; then
   exit 0
 elif [ "$hooksEnabled" != "true" ]; then
-  printf "Invalid option found: commit-tagger.hooksenabled=%s. Allowed values are true (default) and false.\n" "$hooksEnabled" >&2
-  printf "Please use 'git config commit-tagger.hooksenabled true|false' to set a valid configuration.\n" >&2
+  printf "Invalid option found: commit-tagger.hooksEnabled=%s. Allowed values are true (default) and false.\n" "$hooksEnabled" >&2
+  printf "Please use 'git config commit-tagger.hooksEnabled true|false' to set a valid configuration.\n" >&2
   exit 1
 fi
 
 if [ "$commitmsgEnabled" = "false" ]; then
   exit 0
 elif [ "$commitmsgEnabled" != "true" ]; then
-  printf "Invalid option found: commit-tagger.commitmsgenabled=%s. Allowed values are true (default) and false.\n" "$commitmsgEnabled" >&2
-  printf "Please use 'git config commit-tagger.commitmsgenabled true|false' to set a valid configuration.\n" >&2
+  printf "Invalid option found: commit-tagger.commitMsgEnabled=%s. Allowed values are true (default) and false.\n" "$commitmsgEnabled" >&2
+  printf "Please use 'git config commit-tagger.commitMsgEnabled true|false' to set a valid configuration.\n" >&2
   exit 1
 fi
 
@@ -64,7 +63,7 @@ tagMessage () {
     printf "\nError: commit-tagger cannot be found. Please re-install it or remove this hook from your repository.\n" >&2
     printf "You can do so by deleting '%s'.\n" "$(git rev-parse --git-dir)/hooks/prepare-commit-msg" >&2
     printf "If you continue with this commit it will not be tagged or affected in any way.\n\n" >&2
-    prompt "Do you wish to continue? [yes or no]: " >&2
+    prompt "Do you wish to continue? [yes or no]: "
     exit $(($? + 1))
   fi
   printf "%s" "$str"
@@ -91,8 +90,8 @@ case "$tagMode" in
   ;;
 
   *)
-    printf "Invalid option found: commit-tagger.tagmode=%s. Allowed values are opt-in and opt-out (default).\n" "$tagMode" >&2
-    printf "Please use 'git config commit-tagger.tagmode opt-in|opt-out' to set a valid configuration.\n" >&2
+    printf "Invalid option found: commit-tagger.tagMode=%s. Allowed values are opt-in and opt-out (default).\n" "$tagMode" >&2
+    printf "Please use 'git config commit-tagger.tagMode opt-in|opt-out' to set a valid configuration.\n" >&2
     exit 1
   ;;
 esac

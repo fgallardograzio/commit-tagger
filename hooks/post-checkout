@@ -5,22 +5,22 @@
 prevHEAD="$1"
 newHEAD="$2"
 checkoutType="$3"
-hooksEnabled="$(git config --get commit-tagger.hooksenabled || printf "true")"
-checkoutEnabled="$(git config --get commit-tagger.checkoutenabled || printf "true")"
+hooksEnabled="$(git config --get commit-tagger.hooksEnabled || printf "true")"
+checkoutEnabled="$(git config --get commit-tagger.checkoutEnabled || printf "true")"
 
 if [ "$hooksEnabled" = "false" ]; then
   exit 0
 elif [ "$hooksEnabled" != "true" ]; then
-  printf "Invalid option found: commit-tagger.hooksenabled=$hooksEnabled. Allowed values are true (default) and false.\n" >&2
-  printf "Please use 'git config commit-tagger.hooksenabled true|false' to set a valid configuration.\n" >&2
+  printf "Invalid option found: commit-tagger.hooksEnabled=$hooksEnabled. Allowed values are true (default) and false.\n" >&2
+  printf "Please use 'git config commit-tagger.hooksEnabled true|false' to set a valid configuration.\n" >&2
   exit 1
 fi
 
 if [ "$checkoutEnabled" = "false" ]; then
   exit 0
 elif [ "$checkoutEnabled" != "true" ]; then
-  printf "Invalid option found: commit-tagger.hooksenabled=$checkoutEnabled. Allowed values are true (default) and false.\n" >&2
-  printf "Please use 'git config commit-tagger.hooksenabled true|false' to set a valid configuration.\n" >&2
+  printf "Invalid option found: commit-tagger.checkoutEnabled=$checkoutEnabled. Allowed values are true (default) and false.\n" >&2
+  printf "Please use 'git config commit-tagger.checkoutEnabled true|false' to set a valid configuration.\n" >&2
   exit 1
 fi
 
