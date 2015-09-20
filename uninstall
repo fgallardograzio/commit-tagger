@@ -32,12 +32,12 @@ abortUninstall () {
 test -n "$installDir"
 abortUninstall $? "File '$HOME/.commit-tagger/installation_path' not found or empty."
 
-printf "You are about to uninstall 'commit-tagger'. The following files and folders will be permanently deleted:\n\n"
+printf "You are about to uninstall commit-tagger. The following files and folders will be permanently deleted:\n\n"
 printf "%s\n" "$installDir/git-commit-tagger"
 find "$HOME/.commit-tagger"
 printf "\n"
 printf "Warning: If you remove commit-tagger without previously removing all of its hooks from existing repositories\n"
-printf "errors will occur and you will have to delete said files manually.\n\n"
+printf "errors will occur when said hooks are executed and you will have to delete them manually.\n\n"
 prompt "Do you wish to continue? [yes or no]: "
 abortUninstall $?
 

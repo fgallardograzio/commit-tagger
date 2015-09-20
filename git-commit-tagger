@@ -8,6 +8,7 @@ if ! git rev-parse --git-dir > /dev/null 2>&1; then
   exit 1
 fi
 
+version="0.9.0"
 parentsFile="$(git rev-parse --git-dir)/commit-tagger.parents"
 ignoredFile="$(git rev-parse --git-dir)/commit-tagger.ignored"
 parents="$(cat "$parentsFile" 2> /dev/null)"
@@ -369,6 +370,7 @@ Available commands:
   is-ignored [<branch>]
   install-hooks
   uninstall-hooks
+  version
   help
 
 Commands description:
@@ -383,6 +385,7 @@ Commands description:
   is-ignored        Shows whether or not <branch>, or the current branch if omitted, is being ignored.
   install-hooks     Install commit-tagger's hooks into the current git repository.
   uninstall-hooks   Remove commit-tagger's hooks from the current git repository.
+  version           Output version message.
   help              Show this message.
 
 Configuration:
@@ -404,6 +407,16 @@ EOF
 }
 
 # -------- /usage --------
+
+
+# -------- version --------
+
+ctVersion () {
+  printf "%s\n" "$0"
+  printf "version %s\n" "$version"
+}
+
+# -------- /version --------
 
 
 # -------- main --------
@@ -481,7 +494,8 @@ case "$1" in
   # ignore [<branch> [<branch> ...]]
   "ignore")
     if [ -n "$2" ]; then
-      ctIgnore "${@:2}"
+      shift 1
+      ctIgnore "$@"
     else
       ctIgnore "$(git rev-parse --abbrev-ref HEAD)"
     fi
@@ -490,7 +504,8 @@ case "$1" in
   # unignore [<branch> [<branch> ...]]
   "unignore")
     if [ -n "$2" ]; then
-      ctUnignore "${@:2}"
+      shift 1
+      ctUnignore "$@"
     else
       ctUnignore "$(git rev-parse --abbrev-ref HEAD)"
     fi
@@ -516,6 +531,12 @@ case "$1" in
   "uninstall-hooks")
     checkArgs 1 1 $# $@
     ctUninstallHooks
+  ;;
+
+  # version
+  "version")
+    checkArgs 1 1 $# $@
+    ctVersion
   ;;
 
   # help

@@ -7,8 +7,8 @@
 #
 # Example:
 #
-# runCommand "gulp build:prod" "production build"
 # runCommand "gulp jscs"
+# runCommand "gulp build:prod" "production build"
 #
 # This will output something like:
 #   Starting 'production build'...
