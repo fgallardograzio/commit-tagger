@@ -2,7 +2,7 @@
 
 hooksEnabled="$(git config --get commit-tagger.hooksEnabled || printf "true")"
 preCommitEnabled="$(git config --get commit-tagger.preCommitEnabled || printf "true")"
-preCommitVerbose="$(git config --get commit-tagger.preCommitVerbose || printf "false")"
+preCommitVerbose="$(git config --get commit-tagger.preCommitVerbose || printf "true")"
 commandsFile="$(git rev-parse --git-dir)/commit-tagger.precommit"
 
 if [ "$hooksEnabled" = "false" ]; then
@@ -24,7 +24,7 @@ elif [ "$preCommitEnabled" != "true" ]; then
 fi
 
 if [ "$preCommitVerbose" != "true" -a "$preCommitVerbose" != "false" ]; then
-  printf "Invalid option found: commit-tagger.preCommitVerbose=%s. Allowed values are true and false (default).\n" "$preCommitVerbose" >&2
+  printf "Invalid option found: commit-tagger.preCommitVerbose=%s. Allowed values are true (default) and false.\n" "$preCommitVerbose" >&2
   printf "Please use 'git config commit-tagger.preCommitVerbose true|false' to set a valid configuration.\n" >&2
   printf "Commit aborted.\n"
   exit 1
@@ -100,14 +100,14 @@ stashPop () {
   git reset --hard HEAD > /dev/null 2>&1
   if [ $? != 0 ]; then
     printf "An error occurred while trying to reset the working directory.\n" >&2
-    printf "Please check 'git stash list' and run 'git reset --hard HEAD' and 'git stash pop' yourself.\n" >&2
+    printf "Please check 'git stash list' and run 'git reset --hard HEAD' and 'git stash pop --index' yourself.\n" >&2
     printf "Commit aborted.\n"
     exit 1
   fi
   git stash pop --index > /dev/null 2>&1
   if [ $? != 0 ]; then
     printf "An error occurred while trying to restore the working directory from the saved stash.\n" >&2
-    printf "Please check 'git stash list' and run 'git stash pop' yourself.\n" >&2
+    printf "Please check 'git stash list' and run 'git stash pop --index' yourself.\n" >&2
     printf "Commit aborted.\n"
     exit 1
   fi
