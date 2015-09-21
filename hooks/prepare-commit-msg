@@ -10,26 +10,6 @@ commitmsgEnabled="$(git config --get commit-tagger.commitMsgEnabled || printf "t
 confirm="$(git config --get commit-tagger.confirm || printf "true")"
 tagMode="$(git config --get commit-tagger.tagMode || printf "opt-out")"
 
-if [ -n "$2" -a "$2" != "message" ]; then
-  exit 0
-fi
-
-if [ "$hooksEnabled" = "false" ]; then
-  exit 0
-elif [ "$hooksEnabled" != "true" ]; then
-  printf "Invalid option found: commit-tagger.hooksEnabled=%s. Allowed values are true (default) and false.\n" "$hooksEnabled" >&2
-  printf "Please use 'git config commit-tagger.hooksEnabled true|false' to set a valid configuration.\n" >&2
-  exit 1
-fi
-
-if [ "$commitmsgEnabled" = "false" ]; then
-  exit 0
-elif [ "$commitmsgEnabled" != "true" ]; then
-  printf "Invalid option found: commit-tagger.commitMsgEnabled=%s. Allowed values are true (default) and false.\n" "$commitmsgEnabled" >&2
-  printf "Please use 'git config commit-tagger.commitMsgEnabled true|false' to set a valid configuration.\n" >&2
-  exit 1
-fi
-
 exec 0< /dev/tty 1> /dev/tty 2>&1
 
 prompt () {
@@ -52,25 +32,58 @@ prompt () {
 tagMessage () {
   # $1 = message
 
-  local str
+  local msg
+  local tags
   # bash only:
   # if [ "${1:0:1}" = "[" ]; then
-  #   str="$(git commit-tagger tag 2> /dev/null)$1"
+  #   msg="$(git commit-tagger tag 2> /dev/null)$1"
   # else
-  #   str="$(git commit-tagger tag 2> /dev/null) $1"
+  #   msg="$(git commit-tagger tag 2> /dev/null) $1"
   # fi
-  str="$(printf -- "$1" | sed "1 s|^\([^\[].*\)$| \1|")"
-  str="$(git commit-tagger tag 2> /dev/null)$str"
+  tags="$(git commit-tagger tag 2>&1)"
   if [ $? != 0 ]; then
-    printf "\nError: commit-tagger cannot be found. Please re-install it or remove this hook from your repository.\n" >&2
-    printf "You can do so by deleting '%s'.\n" "$(git rev-parse --git-dir)/hooks/prepare-commit-msg" >&2
+    if git commit-tagger version > /dev/null 2>&1; then
+      printf "%s\n\n" "$tags" >&2
+    else
+      printf "\nError: commit-tagger cannot be found. Please re-install it or remove this hook from your repository.\n" >&2
+      printf "You can do so by deleting '%s'.\n\n" "$(git rev-parse --git-dir)/hooks/prepare-commit-msg" >&2
+    fi
     printf "If you continue with this commit it will not be tagged or affected in any way.\n\n" >&2
-    prompt "Do you wish to continue? [yes or no]: "
+    prompt "Do you wish to continue? [yes or no]: " >&2
     exit $(($? + 1))
   fi
-  printf -- "$str"
+  msg="$(printf -- "$1" | sed "1 s|^\([^\[].*\)$| \1|")"
+  printf -- "$tags$msg"
   return 0
 }
+
+abortedCommit () {
+  if [ $? != 0 ]; then
+    printf "\nThe commit has been aborted.\n"
+  fi
+}
+
+trap "abortedCommit" EXIT
+
+if [ -n "$2" -a "$2" != "message" ]; then
+  exit 0
+fi
+
+if [ "$hooksEnabled" = "false" ]; then
+  exit 0
+elif [ "$hooksEnabled" != "true" ]; then
+  printf "Invalid option found: commit-tagger.hooksEnabled=%s. Allowed values are true (default) and false.\n" "$hooksEnabled" >&2
+  printf "Please use 'git config commit-tagger.hooksEnabled true|false' to set a valid configuration.\n" >&2
+  exit 1
+fi
+
+if [ "$commitmsgEnabled" = "false" ]; then
+  exit 0
+elif [ "$commitmsgEnabled" != "true" ]; then
+  printf "Invalid option found: commit-tagger.commitMsgEnabled=%s. Allowed values are true (default) and false.\n" "$commitmsgEnabled" >&2
+  printf "Please use 'git config commit-tagger.commitMsgEnabled true|false' to set a valid configuration.\n" >&2
+  exit 1
+fi
 
 case "$tagMode" in
   "opt-in")
@@ -115,7 +128,6 @@ if [ "$2" = "message" ]; then
         printf -- "$message" > $1
         exit 0
       else
-        printf "The commit has been aborted.\n"
         exit 1
       fi
     ;;

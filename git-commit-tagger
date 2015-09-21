@@ -90,7 +90,8 @@ ctTag () {
         parentExists=$?
         counter=$(($counter - 1))
         if [ $counter -lt 0 ]; then
-          printf "Sorry, there seems to be an error in the branch hierarchy causing an infinite loop.\n" >&2
+          printf "Sorry, an error has occurred. Branch hierarchy is more than 20 levels deep\n" >&2
+          printf "or an infinite loop has been found.\n" >&2
           return 1
         fi
       done
