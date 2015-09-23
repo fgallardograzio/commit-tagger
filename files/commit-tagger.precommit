@@ -16,7 +16,7 @@
 #   Finished 'production build' successfully.
 #   Starting 'gulp jscs'
 #   < command output >
-#   Failed: 'gulp jscs'
+#   Command: 'gulp jscs' failed.
 #   Commit aborted.
 #
 # Remember you can use 'git config commit-tagger.precommitverbose true|false'
@@ -28,6 +28,6 @@
 # You can safely remove the following 'printf's:
 
 printf "  You can run your own commands and tests in here.\n"
-printf "  Add them to '%s'.\n" "$(git rev-parse --git-dir)/commit-tagger.precommit"
+printf "  Run 'git commit-tagger set-precommit' to edit the configuration file.\n"
 printf "  Only changes in the index will be taken into account.\n"
 printf "  Unstaged files will be stashed and automatically restored later.\n"

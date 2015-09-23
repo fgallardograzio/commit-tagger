@@ -33,17 +33,16 @@ tagMessage () {
   # $1 = message
 
   local msg
-  local tags
   # bash only:
   # if [ "${1:0:1}" = "[" ]; then
   #   msg="$(git commit-tagger tag 2> /dev/null)$1"
   # else
   #   msg="$(git commit-tagger tag 2> /dev/null) $1"
   # fi
-  tags="$(git commit-tagger tag 2>&1)"
+  msg="$(git commit-tagger tag "$1" 2>&1)"
   if [ $? != 0 ]; then
     if git commit-tagger version > /dev/null 2>&1; then
-      printf "%s\n\n" "$tags" >&2
+      printf "%s\n\n" "$msg" >&2
     else
       printf "\nError: commit-tagger cannot be found. Please re-install it or remove this hook from your repository.\n" >&2
       printf "You can do so by deleting '%s'.\n\n" "$(git rev-parse --git-dir)/hooks/prepare-commit-msg" >&2
@@ -52,8 +51,7 @@ tagMessage () {
     prompt "Do you wish to continue? [yes or no]: " >&2
     exit $(($? + 1))
   fi
-  msg="$(printf -- "$1" | sed "1 s|^\([^\[].*\)$| \1|")"
-  printf -- "$tags$msg"
+  printf -- "$msg"
   return 0
 }
 

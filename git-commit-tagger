@@ -11,6 +11,7 @@ fi
 version="0.9.0"
 parentsFile="$(git rev-parse --git-dir)/commit-tagger.parents"
 ignoredFile="$(git rev-parse --git-dir)/commit-tagger.ignored"
+preCommitFile="$(git rev-parse --git-dir)/commit-tagger.precommit"
 parents="$(cat "$parentsFile" 2> /dev/null)"
 ignored="$(cat "$ignoredFile" 2> /dev/null)"
 
@@ -65,11 +66,12 @@ getTag () {
 }
 
 ctTag () {
-  # $1 = branch
+  # $1 = branch, $2 message
 
   local parent
   local parentExists
   local tags
+  local message
   local counter
   local tagIgnored
   parent="$(getParent "$1")"
@@ -96,9 +98,14 @@ ctTag () {
         fi
       done
     fi
-    printf "%s\n" "$tags"
-    return 0
   fi
+  if [ -n "$tags" ]; then
+    message="$(printf -- "$2" | sed "1 s|^\([^\[].*\)$| \1|")"
+    printf "%s\n" "$tags$message"
+  else
+    printf "%s\n" "$2"
+  fi
+  return 0
 }
 
 # -------- /tag --------
@@ -261,6 +268,38 @@ ctIsIgnored () {
 # -------- /is-ignored --------
 
 
+# -------- set-precommit --------
+
+checkPreCommitFile () {
+  if [ ! -f "$preCommitFile" ]; then
+    printf "Repository's pre-commit commands file: '%s' not found.\n" "$preCommitFile" >&2
+    if [ -f "$HOME/.commit-tagger/files/commit-tagger.precommit" ]; then
+      cp "$HOME/.commit-tagger/files/commit-tagger.precommit" "$preCommitFile"
+      if [ $? != 0 ]; then
+        printf "There was a problem importing default template.\n"
+        printf "Cannot copy '%s' to '%s'.\n" "$HOME/.commit-tagger/files/commit-tagger.precommit" "$preCommitFile" >&2
+        exit 1
+      fi
+      printf "Imported template from '%s'.\n" "$HOME/.commit-tagger/files/commit-tagger.precommit" >&2
+    else
+      printf "Cannot import default template: file '%s' not found.\n" "$HOME/.commit-tagger/files/commit-tagger.precommit" >&2
+      printf "Please make sure commit-tagger is correctly installed in your system.\n" >&2
+      exit 1
+    fi
+  fi
+  return 0
+}
+
+ctSetPreCommit () {
+  local coreEditor
+  coreEditor="$(git config --get core.editor || printf "vi")"
+  checkPreCommitFile
+  eval "$coreEditor" "$preCommitFile"
+}
+
+# -------- /set-precommit --------
+
+
 # -------- install-hooks --------
 
 ctInstallHooks () {
@@ -362,20 +401,21 @@ ctUsage () {
 Usage: git commit-tagger <command> [<args>]
 
 Available commands:
-  tag [<branch>]
+  tag [<branch>] <message>
   get-parent [<branch>]
   set-parent [<branch>] <parent>
   remove-parent [<branch>]
   ignore [<branch> [<branch> ...]]
   unignore [<branch> [<branch> ...]]
   is-ignored [<branch>]
+  set-precommit
   install-hooks
   uninstall-hooks
   version
   help
 
 Commands description:
-  tag               Get the full list of tags for <branch>, or the current branch if omitted.
+  tag               Prefix <message> with the full list of tags for <branch>, or the current branch if omitted.
   get-parent        Get the name of the parent of <branch>, or the current branch if omitted.
   set-parent        Specify <parent> as the parent branch of <branch>, or the current branch if omitted.
                     The <parent> branch's tag will be included in the commit messages of <branch>.
@@ -384,6 +424,7 @@ Commands description:
                     Branches created with <branch> as base won't automatically have <branch> set as parent.
   unignore          No longer ignore <branch>, or the current branch if omitted.
   is-ignored        Shows whether or not <branch>, or the current branch if omitted, is being ignored.
+  set-precommit     Open in your editor the file containing the commands to be run by the pre-commit hook.
   install-hooks     Install commit-tagger's hooks into the current git repository.
   uninstall-hooks   Remove commit-tagger's hooks from the current git repository.
   version           Output version message.
@@ -451,20 +492,21 @@ checkArgs () {
 }
 
 case "$1" in
-  # tag [<branch>]
+  # tag [<branch>] <message>
   "tag")
-    checkArgs 1 2 $# $@
-    # "${2:-"$(git rev-parse --abbrev-ref HEAD)"}"
-    if [ -n "$2" ]; then
-      ctTag "$2"
+    checkArgs 2 3 $# $@
+    if [ -n "$3" ]; then
+      ctTag "$2" "$3"
     else
-      ctTag "$(git rev-parse --abbrev-ref HEAD)"
+      ctTag "$(git rev-parse --abbrev-ref HEAD)" "$2"
     fi
   ;;
 
   # get-parent [<branch>]
   "get-parent")
     checkArgs 1 2 $# $@
+    # bash only
+    # "${2:-"$(git rev-parse --abbrev-ref HEAD)"}"
     if [ -n "$2" ]; then
       ctGetParent "$2"
     else
@@ -520,6 +562,12 @@ case "$1" in
     else
       ctIsIgnored "$(git rev-parse --abbrev-ref HEAD)"
     fi
+  ;;
+
+  # set-precommit
+  "set-precommit")
+    checkArgs 1 1 $# $@
+    ctSetPreCommit
   ;;
 
   # install-hooks

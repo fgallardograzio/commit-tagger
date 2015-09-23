@@ -31,17 +31,18 @@ if [ "$preCommitVerbose" != "true" -a "$preCommitVerbose" != "false" ]; then
 fi
 
 if [ ! -f "$commandsFile" ]; then
-  printf "File '%s' not found.\n" "$commandsFile"
-  printf "Importing template from '%s'.\n" "$HOME/.commit-tagger/files/commit-tagger.precommit"
+  printf "Repository's pre-commit commands file: '%s' not found.\n" "$commandsFile" >&2
   if [ -f "$HOME/.commit-tagger/files/commit-tagger.precommit" ]; then
     cp "$HOME/.commit-tagger/files/commit-tagger.precommit" "$commandsFile"
     if [ $? != 0 ]; then
-      printf "There was a problem copying '%s' to '%s'.\n" "$HOME/.commit-tagger/files/commit-tagger.precommit" "$commandsFile" >&2
+      printf "There was a problem importing default template.\n"
+      printf "Cannot copy '%s' to '%s'.\n" "$HOME/.commit-tagger/files/commit-tagger.precommit" "$commandsFile" >&2
       printf "Commit aborted.\n"
       exit 1
     fi
+    printf "Imported template from '%s'.\n" "$HOME/.commit-tagger/files/commit-tagger.precommit" >&2
   else
-    printf "File '%s' not found.\n" "$HOME/.commit-tagger/files/commit-tagger.precommit" >&2
+    printf "Cannot import default template: file '%s' not found.\n" "$HOME/.commit-tagger/files/commit-tagger.precommit" >&2
     printf "Please make sure commit-tagger is correctly installed in your system.\n" >&2
     printf "Commit aborted.\n"
     exit 1
@@ -71,7 +72,7 @@ runCommand () {
     printf "Finished '\e[1m%s\e[0m' successfully.\n" "$displayName"
     return 0
   else
-    printf "Failed: '\e[1m%s\e[0m'.\n" "$displayName"
+    printf "Command: '\e[1m%s\e[0m' failed.\n" "$displayName"
     printf "Commit aborted.\n"
     exit 1
   fi
