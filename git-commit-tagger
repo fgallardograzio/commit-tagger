@@ -435,10 +435,10 @@ Configuration:
 
 Available settings:
   hooksEnabled      (true|false) Enable all commit-tagger's hooks in this repository. Default: true.
-  checkoutEnabled   (true|false) Enable the 'post-checkout' hook. Default: true.
+  checkoutEnabled   (true|false) Enable the 'post-checkout' hook to set new branches' parents. Default: true.
   commitMsgEnabled  (true|false) Enable the 'prepare-commit-msg' hook to tag messages. Default: true.
   preCommitEnabled  (true|false) Enable the 'pre-commit' hook to run custom commands. Default: true.
-  preCommitVerbose  (true|false) Show the output of all the tests. Default: true.
+  preCommitVerbose  (true|false) Show the output of the commands run by the pre-commit hook. Default: true.
   tagIgnored        (true|false) Tag commit messages on ignored branches. Default: true.
   confirm           (true|false) Ask for confirmation before actually issuing the commit.
                     Only when -m or -F is used. Default: true.
