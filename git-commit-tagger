@@ -205,6 +205,20 @@ ctRemoveParent () {
 # -------- /remove-parent --------
 
 
+# -------- show-parents --------
+
+ctShowParents () {
+  if [ -n "$parents" ]; then
+    printf "%s\n" "$parents"
+  else
+    printf "No parents have been set in this repository yet.\n"
+  fi
+  return 0
+}
+
+# -------- /show-parents --------
+
+
 # -------- ignore --------
 
 ctIgnore () {
@@ -266,6 +280,20 @@ ctIsIgnored () {
 }
 
 # -------- /is-ignored --------
+
+
+# -------- show-ignored --------
+
+ctShowIgnored () {
+  if [ -n "$ignored" ]; then
+    printf "%s\n" "$ignored"
+  else
+    printf "No branch is being ignored in this repository.\n"
+  fi
+  return 0
+}
+
+# -------- /show-ignored --------
 
 
 # -------- set-precommit --------
@@ -367,31 +395,108 @@ ctUninstallHooks () {
   local hooksDir
   local file
   local fileName
+  local willUninstall
   hooksDir="$(git rev-parse --git-dir)/hooks"
   printf "Repository's Hooks directory: %s\n\n" "$hooksDir"
   for file in "$HOME/.commit-tagger/hooks"/*; do
     if [ ! -e "$file" ]; then
       printf "Directory '%s' does not exist or does not contain any files.\n" "$HOME/.commit-tagger/hooks" >&2
-      printf "Installation aborted.\n"
+      printf "Uninstallation aborted.\n"
       exit 1
     fi
     fileName="$(basename "$file")"
-    if [ ! -e "$hooksDir/$fileName" ]; then
-      printf "File '%s' not found.\n" "$hooksDir/$fileName" >&2
-      continue
-    fi
-    printf "Removing '%s'...\n" "$fileName"
-    if ! rm "$hooksDir/$fileName"; then
-      printf "There was a problem removing '%s' from '%s'.\n" "$fileName" "$hooksDir" >&2
-      printf "Installation aborted.\n"
-      exit 1
+    if [ -e "$hooksDir/$fileName" ]; then
+      if [ "$willUninstall" != "true" ]; then
+        willUninstall="true"
+        printf "The following files will be permanently removed:\n\n"
+      fi
+      printf "%s\n" "$hooksDir/$fileName"
     fi
   done
-  printf "\nHooks successfully uninstalled.\n"
+  if [ "$willUninstall" = "true" ]; then
+    printf "\n"
+    prompt "Do you wish to continue? [yes or no]: "
+    if [ $? = 0 ]; then
+      printf "\n"
+      for file in "$HOME/.commit-tagger/hooks"/*; do
+        fileName="$(basename "$file")"
+        if [ -e "$hooksDir/$fileName" ]; then
+          printf "Removing '%s'...\n" "$fileName"
+          if ! rm "$hooksDir/$fileName"; then
+            printf "There was a problem removing '%s' from '%s'.\n" "$fileName" "$hooksDir" >&2
+            printf "Uninstallation aborted.\n"
+            exit 1
+          fi
+        fi
+      done
+      printf "\nHooks successfully uninstalled.\n"
+    else
+      printf "\nUninstallation aborted.\n"
+    fi
+  else
+    printf "None of commit-tagger's hooks seem to be installed in this repository.\n"
+  fi
   return 0
 }
 
 # -------- /uninstall-hooks --------
+
+
+# -------- clean --------
+
+removeIfExists () {
+  # $1 = filename
+
+  if [ -e "$1" ]; then
+    printf "Removing '%s'...\n" "$1"
+    if ! rm "$1"; then
+      printf "There was a problem removing '%s'.\n" "$1" >&2
+      printf "Clean aborted.\n"
+      exit 1
+    fi
+  fi
+}
+
+ctClean () {
+  if [ -e "$parentsFile" -o -e "$ignoredFile" -o -e "$preCommitFile" ]; then
+    printf "Warning: All data associated to commit-tagger, such as branches' parents, ignored branches\n"
+    printf "and custom pre-commit commands will be permanently lost. The following files will be removed:\n\n"
+    if [ -e "$parentsFile" ]; then
+      printf "%s\n" "$parentsFile"
+    fi
+    if [ -e "$ignoredFile" ]; then
+      printf "%s\n" "$ignoredFile"
+    fi
+    if [ -e "$preCommitFile" ]; then
+      printf "%s\n" "$preCommitFile"
+    fi
+    printf "\n"
+    prompt "Do you wish to continue? [yes or no]: "
+    if [ $? = 0 ]; then
+      printf "\n"
+      removeIfExists "$parentsFile"
+      removeIfExists "$ignoredFile"
+      removeIfExists "$preCommitFile"
+      printf "\nClean finished successfully.\n"
+    else
+      printf "\nClean aborted.\n"
+    fi
+  else
+    printf "No data files associated to commit-tagger found on this repository.\n"
+  fi
+}
+
+# -------- /clean --------
+
+
+# -------- version --------
+
+ctVersion () {
+  printf "%s\n" "$0"
+  printf "version %s\n" "$version"
+}
+
+# -------- /version --------
 
 
 # -------- usage --------
@@ -405,12 +510,15 @@ Available commands:
   get-parent [<branch>]
   set-parent [<branch>] <parent>
   remove-parent [<branch>]
+  show-parents
   ignore [<branch> [<branch> ...]]
   unignore [<branch> [<branch> ...]]
   is-ignored [<branch>]
+  show-ignored
   set-precommit
   install-hooks
   uninstall-hooks
+  clean
   version
   help
 
@@ -420,13 +528,17 @@ Commands description:
   set-parent        Specify <parent> as the parent branch of <branch>, or the current branch if omitted.
                     The <parent> branch's tag will be included in the commit messages of <branch>.
   remove-parent     Remove the parent associated to <branch>, or the current branch if omitted.
+  show-parents      List all the branches and their parents, separated by a colon, one per line.
   ignore            This will result in <branch>, or the current branch if omitted, being ignored.
                     Branches created with <branch> as base won't automatically have <branch> set as parent.
   unignore          No longer ignore <branch>, or the current branch if omitted.
   is-ignored        Shows whether or not <branch>, or the current branch if omitted, is being ignored.
+  show-ignored      List all the branches commit-tagger is currently ignoring, one per line.
   set-precommit     Open in your editor the file containing the commands to be run by the pre-commit hook.
   install-hooks     Install commit-tagger's hooks into the current git repository.
   uninstall-hooks   Remove commit-tagger's hooks from the current git repository.
+  clean             Remove all data associated to commit-tagger, such as branches' parents, ignored branches
+                    and custom pre-commit commands.
   version           Output version message.
   help              Show this message.
 
@@ -449,16 +561,6 @@ EOF
 }
 
 # -------- /usage --------
-
-
-# -------- version --------
-
-ctVersion () {
-  printf "%s\n" "$0"
-  printf "version %s\n" "$version"
-}
-
-# -------- /version --------
 
 
 # -------- main --------
@@ -534,6 +636,12 @@ case "$1" in
     fi
   ;;
 
+  # show-parents
+  "show-parents")
+    checkArgs 1 1 $# $@
+    ctShowParents
+  ;;
+
   # ignore [<branch> [<branch> ...]]
   "ignore")
     if [ -n "$2" ]; then
@@ -564,6 +672,12 @@ case "$1" in
     fi
   ;;
 
+  # show-ignored
+  "show-ignored")
+    checkArgs 1 1 $# $@
+    ctShowIgnored
+  ;;
+
   # set-precommit
   "set-precommit")
     checkArgs 1 1 $# $@
@@ -580,6 +694,12 @@ case "$1" in
   "uninstall-hooks")
     checkArgs 1 1 $# $@
     ctUninstallHooks
+  ;;
+
+  # clean
+  "clean")
+    checkArgs 1 1 $# $@
+    ctClean
   ;;
 
   # version

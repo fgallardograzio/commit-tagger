@@ -20,7 +20,7 @@ A tagged message can be manually generated for any branch using the command `tag
 
 When checking out a new<sup>[1](#branch-creation)</sup> branch, a hierarchical relationship between the base branch and the new branch is automatically established, and commits on the new branch will contain tags for both the current and the parent branch.
 
-These relationships can also be explored and managed using the commands `get-parent`, `set-parent`, `remove-parent`, `ignore`, `unignore` and `is-ignored`.
+These relationships can also be explored and managed using the commands `get-parent`, `set-parent`, `remove-parent`, `show-parents`, `ignore`, `unignore`, `is-ignored` and `show-ignored`.
 
 This relationship model maintains certain correlation with the way that JIRA handles sub-tasks, but it's not limited to only two branches. This feature can be used to automatically include tags from up to 20 *ancestors*.
 
@@ -72,12 +72,15 @@ Usage: git commit-tagger &lt;command&gt; [&lt;args&gt;]
 * get-parent [&lt;branch&gt;]
 * set-parent [&lt;branch&gt;] &lt;parent&gt;
 * remove-parent [&lt;branch&gt;]
+* show-parents
 * ignore [&lt;branch&gt; [&lt;branch&gt; ...]]
 * unignore [&lt;branch&gt; [&lt;branch&gt; ...]]
 * is-ignored [&lt;branch&gt;]
+* show-ignored
 * set-precommit
 * install-hooks
 * uninstall-hooks
+* clean
 * version
 * help
 
@@ -107,6 +110,12 @@ Usage: git commit-tagger remove-parent [&lt;branch&gt;]
 
 Remove the parent associated to &lt;branch&gt;, or the current branch if omitted.
 
+#### show-parents
+
+Usage: git commit-tagger show-parents
+
+List all the branches and their parents, separated by a colon, one per line.
+
 #### ignore
 
 Usage: git commit-tagger [&lt;branch&gt; [&lt;branch&gt; ...]]
@@ -125,6 +134,12 @@ Usage: git commit-tagger [&lt;branch&gt;]
 
 Shows whether or not &lt;branch&gt;, or the current branch if omitted, is being ignored.
 
+#### show-ignored
+
+Usage: git commit-tagger show-ignored
+
+List all the branches commit-tagger is currently ignoring, one per line.
+
 #### set-precommit
 
 Usage: git commit-tagger set-precommit
@@ -142,6 +157,12 @@ Install commit-tagger's hooks into the current git repository.
 Usage: git commit-tagger uninstall-hooks
 
 Remove commit-tagger's hooks from the current git repository.
+
+#### clean
+
+Usage: git commit-tagger clean
+
+Remove all data associated to commit-tagger, such as branches' parents, ignored branches and custom pre-commit commands.
 
 #### version
 
@@ -214,13 +235,22 @@ opt-in: Do not tag commit messages unless prefixed with a "+".
 
 opt-out: Tag all commit messages automatically unless prefixed with a "-".
 
+
 ## Uninstalling commit-tagger
 
-Just like for the installation, uninstalling commit-tagger involves two processes.
+Just like for the installation, uninstalling commit-tagger involves different processes.
 
-The first one is removing all of commit-tagger's hooks from a given repository. You can use th command `uninstall-hooks` to quickly do this. Run:
+The first one is removing all of commit-tagger's hooks from a given repository. You can use the command `uninstall-hooks` to quickly do this. Run:
 
 <pre>git commit-tagger uninstall-hooks</pre>
+
+You may also want to remove all data associated to commit-tagger in a given repository. This includes the list of branches' parents, the list of ignored branches and all custom pre-commit commands.
+
+You can do this by running:
+
+<pre>git commit-tagger clean</pre>
+
+Alternatively, you can manually delete `.git/commit-tagger.parents`, `.git/commit-tagger.ignored` and `.git/commit-tagger.precommit` from a repository.
 
 A different process is actually removing commit-tagger from your system. This involves deleting git-commit-tagger from the installation directory, and removing `~/.commit-tagger` and all of its contents.
 
@@ -228,7 +258,8 @@ In order to do this easily you can use the provided `uninstall` script, if you u
 
 <pre>./uninstall</pre>
 
-The list of the files and folders that will be removed is presented, and you will be prompted for confirmation.
+The list of files and folders that will be removed is presented, and you will be prompted for confirmation.
+
 
 ## Known issues and limitations
 
