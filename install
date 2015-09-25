@@ -1,0 +1,124 @@
+#!/bin/bash
+
+# $1 = [optional] installation dir
+
+prompt () {
+  # $1 = message
+
+  while true; do
+    printf "%s" "$1"
+    read -r promptRes
+    case "$promptRes" in
+      [yY]|[yY][eE][sS])
+        return 0
+      ;;
+      [nN]|[nN][oO])
+        return 1
+      ;;
+    esac
+  done
+}
+
+abortInstall () {
+  # $1 = condition, $2 = message
+
+  if [ $1 != 0 ]; then
+    printf "%s\n" "$2" >&2
+    printf "Installation aborted.\n" >&2
+    exit 1
+  fi
+}
+
+installUsage () {
+  printf "Usage: %s [<installation_path>]\n\n" "$0"
+  printf "If <installation_path> is not provided, by default commit-tagger will be installed in '%s/bin'.\n" "$HOME"
+  printf "To install it in a directory whose name starts with a '-', for example: '-foo' use './-foo' instead.\n" "$0"
+  exit 0
+}
+
+test -f "git-commit-tagger"
+abortInstall $? "Cannot find 'git-commit-tagger'. Please make sure your working directory matches the install script's path."
+
+if [ -n "$1" ]; then
+  if printf -- "$1" | grep -q "^-"; then
+    if [ "$1" = "-h" -o "$1" = "--help" ]; then
+      installUsage
+    else
+      printf "Invalid option: '%s'.\n\n" "$1"
+      installUsage
+    fi
+  fi
+  installDir="${1%%/}"
+else
+  installDir="$HOME/bin"
+  installDefault="true"
+fi
+
+if [ "$installDefault" = "true" ]; then
+  printf "commit-tagger will be installed in '$installDir'. "
+  prompt "Do you wish to continue? [yes or no]: "
+  abortInstall $?
+fi
+printf "\n"
+
+if [ ! -d "$installDir" ]; then
+  if [ "$installDefault" != "true" ]; then
+    prompt "Directory '$installDir' does not exist. Do you wish to create it? [yes or no]: "
+    abortInstall $?
+  fi
+  printf "\nCreating directory '%s'.\n" "$installDir"
+  mkdir -p "$installDir" > /dev/null 2>&1
+  abortInstall $? "There was a problem creating '$installDir'."
+fi
+
+printf "Installing 'git-commit-tagger' into '%s'.\n" "$installDir"
+cp git-commit-tagger "$installDir" > /dev/null 2>&1
+abortInstall $? "There was a problem copying 'git-commit-tagger' to '$installDir'."
+
+printf "Giving execute permissions to '%s'.\n" "$installDir/git-commit-tagger"
+chmod +x "$installDir/git-commit-tagger" > /dev/null 2>&1
+abortInstall $? "There was a problem giving execute permissions to '$installDir/git-commit-tagger'."
+
+if [ ! -d "$HOME/.commit-tagger" ]; then
+  printf "Creating directory '%s/.commit-tagger'.\n" "$HOME"
+  mkdir "$HOME/.commit-tagger" > /dev/null 2>&1
+  abortInstall $? "There was a problem creating '$HOME/.commit-tagger'."
+fi
+
+printf "Saving 'installation_path' to '%s'.\n" "$HOME/.commit-tagger"
+printf "%s" "$installDir" > "$HOME/.commit-tagger/installation_path"
+test -f "$HOME/.commit-tagger/installation_path"
+abortInstall $? "There was a problem creating '$HOME/.commit-tagger/hooks'."
+
+if [ ! -d "$HOME/.commit-tagger/hooks" ]; then
+  printf "Creating directory '%s'.\n" "$HOME/.commit-tagger/hooks"
+  mkdir "$HOME/.commit-tagger/hooks" > /dev/null 2>&1
+  abortInstall $? "There was a problem creating '$HOME/.commit-tagger/hooks'."
+fi
+
+for file in "hooks"/*; do
+  printf "Copying '%s' into '%s'.\n" "$file" "$HOME/.commit-tagger/hooks"
+  cp "$file" "$HOME/.commit-tagger/hooks" > /dev/null 2>&1
+  abortInstall $? "There was a problem copying '$file' into '$HOME/.commit-tagger/hooks'."
+done
+
+if [ ! -d "$HOME/.commit-tagger/files" ]; then
+  printf "Creating directory '%s/.commit-tagger/files'.\n" "$HOME"
+  mkdir "$HOME/.commit-tagger/files" > /dev/null 2>&1
+  abortInstall $? "There was a problem creating '$HOME/.commit-tagger/files'."
+fi
+
+for file in "files"/*; do
+  printf "Copying '%s' into '%s'.\n" "$file" "$HOME/.commit-tagger/files"
+  cp "$file" "$HOME/.commit-tagger/files" > /dev/null 2>&1
+  abortInstall $? "There was a problem copying '$file' into '$HOME/.commit-tagger/files'."
+done
+
+printf "\nInstallation successful.\n"
+
+fullInstallDir="$(cd "$installDir" 2>/dev/null && pwd)"
+if [ -n "$fullInstallDir" ] && ! printf -- "$PATH" | grep -q "^$fullInstallDir\|:$fullInstallDir"; then
+  printf "\nPlease make sure that '%s' is in your system PATH.\n" "$fullInstallDir"
+fi
+
+exit 0

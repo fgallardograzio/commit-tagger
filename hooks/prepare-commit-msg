@@ -1,0 +1,144 @@
+#!/bin/bash
+
+# $1 = filename that contains the message, $2 = source of the commit message
+
+message="$(cat $1)"
+branch="$(git rev-parse --abbrev-ref HEAD)"
+
+hooksEnabled="$(git config --get commit-tagger.hooksEnabled || printf "true")"
+commitmsgEnabled="$(git config --get commit-tagger.commitMsgEnabled || printf "true")"
+confirm="$(git config --get commit-tagger.confirm || printf "true")"
+tagMode="$(git config --get commit-tagger.tagMode || printf "opt-out")"
+
+exec 0< /dev/tty 1> /dev/tty 2>&1
+
+prompt () {
+  # $1 = message
+
+  while true; do
+    printf "%s" "$1"
+    read -r promptRes
+    case "$promptRes" in
+      [yY]|[yY][eE][sS])
+        return 0
+      ;;
+      [nN]|[nN][oO])
+        return 1
+      ;;
+    esac
+  done
+}
+
+tagMessage () {
+  # $1 = message
+
+  local msg
+  # bash only:
+  # if [ "${1:0:1}" = "[" ]; then
+  #   msg="$(git commit-tagger tag 2> /dev/null)$1"
+  # else
+  #   msg="$(git commit-tagger tag 2> /dev/null) $1"
+  # fi
+  msg="$(git commit-tagger tag "$1" 2>&1)"
+  if [ $? != 0 ]; then
+    if git commit-tagger version > /dev/null 2>&1; then
+      printf "%s\n\n" "$msg" >&2
+    else
+      printf "\nError: commit-tagger cannot be found. Please re-install it or remove this hook from your repository.\n" >&2
+      printf "You can do so by deleting '%s'.\n\n" "$(git rev-parse --git-dir)/hooks/prepare-commit-msg" >&2
+    fi
+    printf "If you continue with this commit it will not be tagged or affected in any way.\n\n" >&2
+    prompt "Do you wish to continue? [yes or no]: " >&2
+    exit $(($? + 1))
+  fi
+  printf -- "$msg"
+  return 0
+}
+
+abortedCommit () {
+  if [ $? != 0 ]; then
+    printf "\nThe commit has been aborted.\n"
+  fi
+}
+
+trap "abortedCommit" EXIT
+
+if [ -n "$2" -a "$2" != "message" ]; then
+  exit 0
+fi
+
+if [ "$hooksEnabled" = "false" ]; then
+  exit 0
+elif [ "$hooksEnabled" != "true" ]; then
+  printf "Invalid option found: commit-tagger.hooksEnabled=%s. Allowed values are true (default) and false.\n" "$hooksEnabled" >&2
+  printf "Please use 'git config commit-tagger.hooksEnabled true|false' to set a valid configuration.\n" >&2
+  exit 1
+fi
+
+if [ "$commitmsgEnabled" = "false" ]; then
+  exit 0
+elif [ "$commitmsgEnabled" != "true" ]; then
+  printf "Invalid option found: commit-tagger.commitMsgEnabled=%s. Allowed values are true (default) and false.\n" "$commitmsgEnabled" >&2
+  printf "Please use 'git config commit-tagger.commitMsgEnabled true|false' to set a valid configuration.\n" >&2
+  exit 1
+fi
+
+case "$tagMode" in
+  "opt-in")
+    # bash only:
+    # if [ "${message:0:1}" = "+" ]; then
+    #   message="$(tagMessage "${message:1}")" || exit $(($? - 1))
+    # fi
+    if printf -- "$message" | head -1 | grep -q "^+"; then
+      message="$(printf -- "$message" | sed "1 s|^+||")"
+      message="$(tagMessage "$message")" || exit $(($? - 1))
+    fi
+  ;;
+
+  "opt-out")
+    # bash only:
+    # if [ "${message:0:1}" != "-" ]; then
+    #   message="$(tagMessage "$message")" || exit $(($? - 1))
+    # else
+    #   message="${message:1}"
+    # fi
+    if printf -- "$message" | head -1 | grep -q -v "^-"; then
+      message="$(tagMessage "$message")" || exit $(($? - 1))
+    else
+      message="$(printf -- "$message" | sed "1 s|^-||")"
+    fi
+  ;;
+
+  *)
+    printf "Invalid option found: commit-tagger.tagMode=%s. Allowed values are opt-in and opt-out (default).\n" "$tagMode" >&2
+    printf "Please use 'git config commit-tagger.tagMode opt-in|opt-out' to set a valid configuration.\n" >&2
+    exit 1
+  ;;
+esac
+
+if [ "$2" = "message" ]; then
+  case "$confirm" in
+    "true")
+      formatMessage="$(printf -- "$message" | sed "s|^|  |")"
+      printf "The commit message will be the following:\n\n%s\n\n\n" "$formatMessage"
+      prompt "Do you wish to continue? [yes or no]: "
+      if [ $? = 0 ]; then
+        printf -- "$message" > $1
+        exit 0
+      else
+        exit 1
+      fi
+    ;;
+    "false")
+      printf -- "$message" > $1
+    ;;
+    *)
+      printf "Invalid option found: commit-tagger.confirm=%s. Allowed values are true (default) and false.\n" "$confirm" >&2
+      printf "Please use 'git config commit-tagger.confirm true|false' to set a valid configuration.\n" >&2
+      exit 1
+    ;;
+  esac
+else
+  printf -- "$message" > $1
+  exit 0
+fi

@@ -1,0 +1,33 @@
+# Add the commands you want to run before each commit here!
+# Syntax:
+#   runCommand "<command>" ["<displayName>"]
+#
+# if <displayName> is omitted, <command> will be shown instead as a label
+# in "Starting", "Finished" and "Failed" messages.
+#
+# Example:
+#
+# runCommand "gulp jscs"
+# runCommand "gulp build:prod" "production build"
+#
+# This will output something like:
+#   Starting 'production build'...
+#   < command output >
+#   Finished 'production build' successfully.
+#   Starting 'gulp jscs'
+#   < command output >
+#   Command: 'gulp jscs' failed.
+#   Commit aborted.
+#
+# Remember you can use 'git config commit-tagger.precommitverbose true|false'
+# to show or hide your commands' output.
+#
+# Please be careful not to omit 'runCommand' and write the command between quotation marks.
+
+
+# You can safely remove the following 'printf's:
+
+printf "  You can run your own commands and tests in here.\n"
+printf "  Run 'git commit-tagger set-precommit' to edit the configuration file.\n"
+printf "  Only changes in the index will be taken into account.\n"
+printf "  Unstaged files will be stashed and automatically restored later.\n"

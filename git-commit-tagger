@@ -1,0 +1,733 @@
+#!/bin/bash
+
+
+# -------- general --------
+
+if ! git rev-parse --git-dir > /dev/null 2>&1; then
+  printf "Error: Current directory (or any of the parent directories) is not a git repository.\n"
+  exit 1
+fi
+
+version="0.9.0"
+parentsFile="$(git rev-parse --git-dir)/commit-tagger.parents"
+ignoredFile="$(git rev-parse --git-dir)/commit-tagger.ignored"
+preCommitFile="$(git rev-parse --git-dir)/commit-tagger.precommit"
+parents="$(cat "$parentsFile" 2> /dev/null)"
+ignored="$(cat "$ignoredFile" 2> /dev/null)"
+
+getParent () {
+  #$1 = branch
+
+  local parent
+  parent="$(printf "%s" "$parents" | sed -n "s|^$1:||p" | head -1)"
+  if [ -n "$parent" ]; then
+    printf "%s" "$parent"
+    return 0
+  else
+    return 1
+  fi
+}
+
+isIgnored () {
+  # $1 = branch
+
+  printf "%s" "$ignored" | grep -q "^$1$"
+  return $?
+}
+
+prompt () {
+  # $1 = message
+
+  while true; do
+    printf "%s" "$1"
+    read -r promptRes
+    case "$promptRes" in
+      [yY]|[yY][eE][sS])
+        return 0
+      ;;
+      [nN]|[nN][oO])
+        return 1
+      ;;
+    esac
+  done
+}
+
+# -------- /general --------
+
+
+# -------- tag --------
+
+getTag () {
+  # $1 = branch
+
+  # printf "%s" "$(printf "%s" $1 | sed "s|.*\/||")"
+  printf "%s" "${1##*/}"
+  return 0
+}
+
+ctTag () {
+  # $1 = branch, $2 message
+
+  local parent
+  local parentExists
+  local tags
+  local message
+  local counter
+  local tagIgnored
+  parent="$(getParent "$1")"
+  parentExists=$?
+  tagIgnored="$(git config --get commit-tagger.tagIgnored || printf "true")"
+  if  [ "$tagIgnored" != "true" -a "$tagIgnored" != "false" ]; then
+    printf "Invalid option found: 'commit-tagger.tagIgnored=%s'. Allowed values are true (default) and false.\n" "$tagIgnored" >&2
+    printf "Please use 'git config commit-tagger.tagIgnored true|false' to set a valid configuration.\n" >&2
+    return 1
+  fi
+  if ! isIgnored $1 || [ "$tagIgnored" = "true" ]; then
+    tags="[$(getTag "$1")]"
+    if [ "$parentExists" -eq 0 ]; then
+      counter=20
+      while [ "$parentExists" -eq 0 ] && ! isIgnored "$parent"; do
+        tags="[$(getTag "$parent")]$tags"
+        parent="$(getParent "$parent")"
+        parentExists=$?
+        counter=$(($counter - 1))
+        if [ $counter -lt 0 ]; then
+          printf "Sorry, an error has occurred. Branch hierarchy is more than 20 levels deep\n" >&2
+          printf "or an infinite loop has been found.\n" >&2
+          return 1
+        fi
+      done
+    fi
+  fi
+  if [ -n "$tags" ]; then
+    message="$(printf -- "$2" | sed "1 s|^\([^\[].*\)$| \1|")"
+    printf "%s\n" "$tags$message"
+  else
+    printf "%s\n" "$2"
+  fi
+  return 0
+}
+
+# -------- /tag --------
+
+
+# -------- get-parent --------
+
+ctGetParent () {
+  # $1 = branch
+
+  local parent
+  parent=$(getParent "$1")
+  if [ $? = 0 ]; then
+    printf "The parent of branch \e[1m%s\e[0m is \e[1m%s\e[0m.\n" "$1" "$parent"
+    if isIgnored "$1"; then
+      printf "Branch \e[1m%s\e[0m is being ignored.\n" "$1"
+    fi
+    if isIgnored "$parent"; then
+      printf "Branch \e[1m%s\e[0m is being ignored.\n" "$parent"
+    fi
+    return 0
+  else
+    printf "Branch \e[1m%s\e[0m does not have a parent.\n" "$1"
+    if isIgnored "$1"; then
+      printf "Branch \e[1m%s\e[0m is being ignored.\n" "$1"
+    fi
+    return 1
+  fi
+}
+
+# -------- /get-parent --------
+
+
+# -------- set-parent --------
+
+ctSetParent () {
+  # $1 = branch, $2 = parentBranch
+
+  local parent
+  local counter
+  parent="$2"
+  counter=20
+  if [ "$1" = "$2" ]; then
+    printf "Branch \e[1m%s\e[0m cannot be its own parent.\n" "$1" >&2
+    return 1
+  fi
+  while getParent "$parent" > /dev/null; do
+    parent="$(getParent "$parent")"
+    counter=$(($counter - 1))
+    if [ "$parent" = "$1" -o $counter -lt 0 ]; then
+      printf "The parent of branch \e[1m%s\e[0m cannot be \e[1m%s\e[0m since that would result in an infinite loop.\n" "$1" "$2" >&2
+      return 1
+    fi
+  done
+  if getParent "$1" > /dev/null; then
+    sed "s|^$1:.*$|$1:$2|g" "$parentsFile" > "$parentsFile.new" && mv "$parentsFile.new" "$parentsFile"
+  else
+    printf "%s:%s\n" "$1" "$2" >> "$parentsFile"
+  fi
+  printf "The parent of branch \e[1m%s\e[0m has been set to \e[1m%s\e[0m.\n" "$1" "$2"
+  if isIgnored "$1"; then
+    printf "Branch \e[1m%s\e[0m is being ignored.\n" "$1"
+  fi
+  if isIgnored "$2"; then
+    printf "Branch \e[1m%s\e[0m is being ignored.\n" "$2"
+  fi
+  return 0
+}
+
+# -------- /set-parent --------
+
+
+# -------- remove-parent --------
+
+ctRemoveParent () {
+  # $1 = branch
+
+  local parent
+  parent="$(getParent "$1")"
+  if [ $? -eq 0 ]; then
+    parents="$(grep -v "^$1:" "$parentsFile")"
+    if [ -n "$parents" ]; then
+      printf "%s\n" "$parents" > "$parentsFile"
+    else
+      printf "" > "$parentsFile"
+    fi
+    printf "Branch \e[1m%s\e[0m no longer has \e[1m%s\e[0m set as parent.\n" "$1" "$parent"
+  else
+    printf "There isn't any parent set for branch \e[1m%s\e[0m.\n" "$1"
+  fi
+  if isIgnored "$1"; then
+    printf "Branch \e[1m%s\e[0m is being ignored.\n" "$1"
+  fi
+  return 0
+}
+
+# -------- /remove-parent --------
+
+
+# -------- show-parents --------
+
+ctShowParents () {
+  if [ -n "$parents" ]; then
+    printf "%s\n" "$parents"
+  else
+    printf "No parents have been set in this repository yet.\n"
+  fi
+  return 0
+}
+
+# -------- /show-parents --------
+
+
+# -------- ignore --------
+
+ctIgnore () {
+  # $@ = list of branches
+
+  local branch
+  for branch in "$@"; do
+    if ! isIgnored "$branch"; then
+      ignored="$ignored\n$branch"
+      printf "%s\n" "$branch" >> "$ignoredFile"
+      printf "Branch \e[1m%s\e[0m is now being ignored.\n" "$branch"
+    else
+      printf "Branch \e[1m%s\e[0m is already being ignored.\n" "$branch"
+    fi
+  done
+  return 0
+}
+
+# -------- /ignore --------
+
+
+# -------- unignore --------
+
+ctUnignore () {
+  # $@ = list of branches
+
+  local branch
+  for branch in "$@"; do
+    if isIgnored "$branch"; then
+      ignored="$(grep -v "^$branch$" "$ignoredFile")"
+      if [ -n "$ignored" ]; then
+        printf "%s\n" "$ignored" > "$ignoredFile"
+      else
+        printf "" > "$ignoredFile"
+      fi
+      printf "Branch \e[1m%s\e[0m is no longer being ignored.\n" "$branch"
+    else
+      printf "Branch \e[1m%s\e[0m is not currently beign ignored.\n" "$branch"
+    fi
+  done
+  return 0
+}
+
+# -------- /unignore --------
+
+
+# -------- is-ignored --------
+
+ctIsIgnored () {
+  # $1 = branch
+
+  if isIgnored "$1"; then
+    printf "Branch \e[1m%s\e[0m is being ignored.\n" "$1"
+    return 0
+  else
+    printf "Branch \e[1m%s\e[0m is not being ignored.\n" "$1"
+    return 1
+  fi
+}
+
+# -------- /is-ignored --------
+
+
+# -------- show-ignored --------
+
+ctShowIgnored () {
+  if [ -n "$ignored" ]; then
+    printf "%s\n" "$ignored"
+  else
+    printf "No branch is being ignored in this repository.\n"
+  fi
+  return 0
+}
+
+# -------- /show-ignored --------
+
+
+# -------- set-precommit --------
+
+checkPreCommitFile () {
+  if [ ! -f "$preCommitFile" ]; then
+    printf "Repository's pre-commit commands file: '%s' not found.\n" "$preCommitFile" >&2
+    if [ -f "$HOME/.commit-tagger/files/commit-tagger.precommit" ]; then
+      cp "$HOME/.commit-tagger/files/commit-tagger.precommit" "$preCommitFile"
+      if [ $? != 0 ]; then
+        printf "There was a problem importing default template.\n"
+        printf "Cannot copy '%s' to '%s'.\n" "$HOME/.commit-tagger/files/commit-tagger.precommit" "$preCommitFile" >&2
+        exit 1
+      fi
+      printf "Imported template from '%s'.\n" "$HOME/.commit-tagger/files/commit-tagger.precommit" >&2
+    else
+      printf "Cannot import default template: file '%s' not found.\n" "$HOME/.commit-tagger/files/commit-tagger.precommit" >&2
+      printf "Please make sure commit-tagger is correctly installed in your system.\n" >&2
+      exit 1
+    fi
+  fi
+  return 0
+}
+
+ctSetPreCommit () {
+  local coreEditor
+  coreEditor="$(git config --get core.editor || printf "vi")"
+  checkPreCommitFile
+  eval "$coreEditor" "$preCommitFile"
+}
+
+# -------- /set-precommit --------
+
+
+# -------- install-hooks --------
+
+ctInstallHooks () {
+  local gitDir
+  local hooksDir
+  local file
+  local fileName
+  local replaceFiles
+  gitDir="$(git rev-parse --git-dir)"
+  hooksDir="$gitDir/hooks"
+  printf "Repository's Hooks directory: %s\n\n" "$hooksDir"
+  for file in "$HOME/.commit-tagger/hooks"/*; do
+    if [ ! -e "$file" ]; then
+      printf "Directory '%s' does not exist or does not contain any files.\n" "$HOME/.commit-tagger/hooks" >&2
+      printf "Installation aborted.\n"
+      exit 1
+    fi
+    fileName="$(basename "$file")";
+    if [ -e "$hooksDir/$fileName" ]; then
+      replaceFiles="true"
+      printf "File '%s/%s' already exists.\n" "$hooksDir" "$fileName"
+    fi
+  done
+  if [ "$replaceFiles" = "true" ]; then
+    printf "\nIf you continue those files will be replaced.\n"
+    prompt "Do you wish to continue? [yes or no]: "
+    if [ $? != 0 ]; then
+      printf "\nInstallation aborted.\n"
+      exit 1
+    fi
+    printf "\n"
+  fi
+  for file in "$HOME/.commit-tagger/hooks"/*; do
+    fileName="$(basename "$file")"
+    printf "Installing '%s'...\n" "$fileName"
+    if ! cp "$file" "$hooksDir"; then
+      printf "There was a problem copying '%s' to '%s'.\n" "$file" "$hooksDir" >&2
+      printf "Installation aborted.\n"
+      exit 1
+    fi
+    if ! chmod +x "$hooksDir/$fileName"; then
+      printf "There was a problem giving execute permissions to '%s/%s'.\n" "$hooksDir" "$fileName" >&2
+      printf "Installation aborted.\n"
+      exit 1
+    fi
+  done
+  if [ ! -f "$gitDir/commit-tagger.precommit" ]; then
+    printf "Importing pre-commit template.\n"
+    if ! cp "$HOME/.commit-tagger/files/commit-tagger.precommit" "$gitDir"; then
+      printf "There was a problem copying '%s' to '%s'.\n" "$HOME/.commit-tagger/files/commit-tagger.precommit" "$gitDir" >&2
+      printf "Installation aborted.\n"
+      exit 1
+    fi
+  fi
+  printf "\nHooks successfully installed.\n"
+  return 0
+}
+
+# -------- /install-hooks --------
+
+
+# -------- uninstall-hooks --------
+
+ctUninstallHooks () {
+  local hooksDir
+  local file
+  local fileName
+  local willUninstall
+  hooksDir="$(git rev-parse --git-dir)/hooks"
+  printf "Repository's Hooks directory: %s\n\n" "$hooksDir"
+  for file in "$HOME/.commit-tagger/hooks"/*; do
+    if [ ! -e "$file" ]; then
+      printf "Directory '%s' does not exist or does not contain any files.\n" "$HOME/.commit-tagger/hooks" >&2
+      printf "Uninstallation aborted.\n"
+      exit 1
+    fi
+    fileName="$(basename "$file")"
+    if [ -e "$hooksDir/$fileName" ]; then
+      if [ "$willUninstall" != "true" ]; then
+        willUninstall="true"
+        printf "The following files will be permanently removed:\n\n"
+      fi
+      printf "%s\n" "$hooksDir/$fileName"
+    fi
+  done
+  if [ "$willUninstall" = "true" ]; then
+    printf "\n"
+    prompt "Do you wish to continue? [yes or no]: "
+    if [ $? = 0 ]; then
+      printf "\n"
+      for file in "$HOME/.commit-tagger/hooks"/*; do
+        fileName="$(basename "$file")"
+        if [ -e "$hooksDir/$fileName" ]; then
+          printf "Removing '%s'...\n" "$fileName"
+          if ! rm "$hooksDir/$fileName"; then
+            printf "There was a problem removing '%s' from '%s'.\n" "$fileName" "$hooksDir" >&2
+            printf "Uninstallation aborted.\n"
+            exit 1
+          fi
+        fi
+      done
+      printf "\nHooks successfully uninstalled.\n"
+    else
+      printf "\nUninstallation aborted.\n"
+    fi
+  else
+    printf "None of commit-tagger's hooks seem to be installed in this repository.\n"
+  fi
+  return 0
+}
+
+# -------- /uninstall-hooks --------
+
+
+# -------- clean --------
+
+removeIfExists () {
+  # $1 = filename
+
+  if [ -e "$1" ]; then
+    printf "Removing '%s'...\n" "$1"
+    if ! rm "$1"; then
+      printf "There was a problem removing '%s'.\n" "$1" >&2
+      printf "Clean aborted.\n"
+      exit 1
+    fi
+  fi
+}
+
+ctClean () {
+  if [ -e "$parentsFile" -o -e "$ignoredFile" -o -e "$preCommitFile" ]; then
+    printf "Warning: All data associated to commit-tagger, such as branches' parents, ignored branches\n"
+    printf "and custom pre-commit commands will be permanently lost. The following files will be removed:\n\n"
+    if [ -e "$parentsFile" ]; then
+      printf "%s\n" "$parentsFile"
+    fi
+    if [ -e "$ignoredFile" ]; then
+      printf "%s\n" "$ignoredFile"
+    fi
+    if [ -e "$preCommitFile" ]; then
+      printf "%s\n" "$preCommitFile"
+    fi
+    printf "\n"
+    prompt "Do you wish to continue? [yes or no]: "
+    if [ $? = 0 ]; then
+      printf "\n"
+      removeIfExists "$parentsFile"
+      removeIfExists "$ignoredFile"
+      removeIfExists "$preCommitFile"
+      printf "\nClean finished successfully.\n"
+    else
+      printf "\nClean aborted.\n"
+    fi
+  else
+    printf "No data files associated to commit-tagger found on this repository.\n"
+  fi
+}
+
+# -------- /clean --------
+
+
+# -------- version --------
+
+ctVersion () {
+  printf "%s\n" "$0"
+  printf "version %s\n" "$version"
+}
+
+# -------- /version --------
+
+
+# -------- usage --------
+
+ctUsage () {
+  cat <<"EOF"
+Usage: git commit-tagger <command> [<args>]
+
+Available commands:
+  tag [<branch>] <message>
+  get-parent [<branch>]
+  set-parent [<branch>] <parent>
+  remove-parent [<branch>]
+  show-parents
+  ignore [<branch> [<branch> ...]]
+  unignore [<branch> [<branch> ...]]
+  is-ignored [<branch>]
+  show-ignored
+  set-precommit
+  install-hooks
+  uninstall-hooks
+  clean
+  version
+  help
+
+Commands description:
+  tag               Prefix <message> with the full list of tags for <branch>, or the current branch if omitted.
+  get-parent        Get the name of the parent of <branch>, or the current branch if omitted.
+  set-parent        Specify <parent> as the parent branch of <branch>, or the current branch if omitted.
+                    The <parent> branch's tag will be included in the commit messages of <branch>.
+  remove-parent     Remove the parent associated to <branch>, or the current branch if omitted.
+  show-parents      List all the branches and their parents, separated by a colon, one per line.
+  ignore            This will result in <branch>, or the current branch if omitted, being ignored.
+                    Branches created with <branch> as base won't automatically have <branch> set as parent.
+  unignore          No longer ignore <branch>, or the current branch if omitted.
+  is-ignored        Shows whether or not <branch>, or the current branch if omitted, is being ignored.
+  show-ignored      List all the branches commit-tagger is currently ignoring, one per line.
+  set-precommit     Open in your editor the file containing the commands to be run by the pre-commit hook.
+  install-hooks     Install commit-tagger's hooks into the current git repository.
+  uninstall-hooks   Remove commit-tagger's hooks from the current git repository.
+  clean             Remove all data associated to commit-tagger, such as branches' parents, ignored branches
+                    and custom pre-commit commands.
+  version           Output version message.
+  help              Show this message.
+
+Configuration:
+  git config commit-tagger.<setting> <value>
+
+Available settings:
+  hooksEnabled      (true|false) Enable all commit-tagger's hooks in this repository. Default: true.
+  checkoutEnabled   (true|false) Enable the 'post-checkout' hook to set new branches' parents. Default: true.
+  commitMsgEnabled  (true|false) Enable the 'prepare-commit-msg' hook to tag messages. Default: true.
+  preCommitEnabled  (true|false) Enable the 'pre-commit' hook to run custom commands. Default: true.
+  preCommitVerbose  (true|false) Show the output of the commands run by the pre-commit hook. Default: true.
+  tagIgnored        (true|false) Tag commit messages on ignored branches. Default: true.
+  confirm           (true|false) Ask for confirmation before actually issuing the commit.
+                    Only when -m or -F is used. Default: true.
+  tagMode           (opt-in|opt-out) Default: opt-out.
+                    opt-in: Do not tag commit messages unless prefixed with a "+".
+                    opt-out: Tag all commit messages automatically unless prefixed with a "-".
+EOF
+}
+
+# -------- /usage --------
+
+
+# -------- main --------
+
+checkArgs () {
+  # $1 = min, $2 = max, $3 = argc, $4+ = argv
+
+  local min
+  local max
+  local argc
+  local comm
+  local args
+  min="$1"
+  max="$2"
+  argc="$3"
+  comm="$4"
+  shift 4
+  args="$@"
+  if [ "$argc" -lt "$min" ]; then
+    printf "Missing required arguments for command '%s'.\n" "$comm" >&2
+    printf "Please run 'git commit-tagger help' to see the list of available commands.\n" >&2
+    exit 1
+  elif [ "$argc" -gt "$max" ]; then
+    printf "Invalid arguments: '%s' for command '%s'.\n" "$args" "$comm" >&2
+    printf "Please run 'git commit-tagger help' to see the list of available commands.\n" >&2
+    exit 1
+  fi
+
+  # bash only:
+  # ${@:5} = shift 4; $@
+}
+
+case "$1" in
+  # tag [<branch>] <message>
+  "tag")
+    checkArgs 2 3 $# $@
+    if [ -n "$3" ]; then
+      ctTag "$2" "$3"
+    else
+      ctTag "$(git rev-parse --abbrev-ref HEAD)" "$2"
+    fi
+  ;;
+
+  # get-parent [<branch>]
+  "get-parent")
+    checkArgs 1 2 $# $@
+    # bash only
+    # "${2:-"$(git rev-parse --abbrev-ref HEAD)"}"
+    if [ -n "$2" ]; then
+      ctGetParent "$2"
+    else
+      ctGetParent "$(git rev-parse --abbrev-ref HEAD)"
+    fi
+  ;;
+
+  # set-parent [<branch>] <parent>
+  "set-parent")
+    checkArgs 2 3 $# $@
+    if [ -n "$3" ]; then
+      ctSetParent "$2" "$3"
+    else
+      ctSetParent "$(git rev-parse --abbrev-ref HEAD)" "$2"
+    fi
+  ;;
+
+  # remove-parent [<branch>]
+  "remove-parent")
+    checkArgs 1 2 $# $@
+    if [ -n "$2" ]; then
+      ctRemoveParent "$2"
+    else
+      ctRemoveParent "$(git rev-parse --abbrev-ref HEAD)"
+    fi
+  ;;
+
+  # show-parents
+  "show-parents")
+    checkArgs 1 1 $# $@
+    ctShowParents
+  ;;
+
+  # ignore [<branch> [<branch> ...]]
+  "ignore")
+    if [ -n "$2" ]; then
+      shift 1
+      ctIgnore "$@"
+    else
+      ctIgnore "$(git rev-parse --abbrev-ref HEAD)"
+    fi
+  ;;
+
+  # unignore [<branch> [<branch> ...]]
+  "unignore")
+    if [ -n "$2" ]; then
+      shift 1
+      ctUnignore "$@"
+    else
+      ctUnignore "$(git rev-parse --abbrev-ref HEAD)"
+    fi
+  ;;
+
+  # is-ignored [<branch>]
+  "is-ignored")
+    checkArgs 1 2 $# $@
+    if [ -n "$2" ]; then
+      ctIsIgnored "$2"
+    else
+      ctIsIgnored "$(git rev-parse --abbrev-ref HEAD)"
+    fi
+  ;;
+
+  # show-ignored
+  "show-ignored")
+    checkArgs 1 1 $# $@
+    ctShowIgnored
+  ;;
+
+  # set-precommit
+  "set-precommit")
+    checkArgs 1 1 $# $@
+    ctSetPreCommit
+  ;;
+
+  # install-hooks
+  "install-hooks")
+    checkArgs 1 1 $# $@
+    ctInstallHooks
+  ;;
+
+  # uninstall-hooks
+  "uninstall-hooks")
+    checkArgs 1 1 $# $@
+    ctUninstallHooks
+  ;;
+
+  # clean
+  "clean")
+    checkArgs 1 1 $# $@
+    ctClean
+  ;;
+
+  # version
+  "version")
+    checkArgs 1 1 $# $@
+    ctVersion
+  ;;
+
+  # help
+  "help")
+    checkArgs 1 1 $# $@
+    ctUsage
+  ;;
+
+  # no command provided
+  "")
+    ctUsage
+    exit 1
+  ;;
+
+  # invalid command
+  *)
+    printf "Invalid command: '%s'.\n" "$1" >&2
+    printf "Please run 'git commit-tagger help' to see the list of available commands.\n" >&2
+    exit 1
+  ;;
+esac
+
+exit $?
+
+# -------- /main --------

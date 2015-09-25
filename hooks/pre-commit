@@ -1,0 +1,135 @@
+#!/bin/bash
+
+hooksEnabled="$(git config --get commit-tagger.hooksEnabled || printf "true")"
+preCommitEnabled="$(git config --get commit-tagger.preCommitEnabled || printf "true")"
+preCommitVerbose="$(git config --get commit-tagger.preCommitVerbose || printf "true")"
+commandsFile="$(git rev-parse --git-dir)/commit-tagger.precommit"
+
+if [ "$hooksEnabled" = "false" ]; then
+  exit 0
+elif [ "$hooksEnabled" != "true" ]; then
+  printf "Invalid option found: commit-tagger.hooksEnabled=%s. Allowed values are true (default) and false.\n" "$hooksEnabled" >&2
+  printf "Please use 'git config commit-tagger.hooksEnabled true|false' to set a valid configuration.\n" >&2
+  printf "Commit aborted.\n"
+  exit 1
+fi
+
+if [ "$preCommitEnabled" = "false" ]; then
+  exit 0
+elif [ "$preCommitEnabled" != "true" ]; then
+  printf "Invalid option found: commit-tagger.preCommitEnabled=%s. Allowed values are true (default) and false.\n" "$preCommitEnabled" >&2
+  printf "Please use 'git config commit-tagger.preCommitEnabled true|false' to set a valid configuration.\n" >&2
+  printf "Commit aborted.\n"
+  exit 1
+fi
+
+if [ "$preCommitVerbose" != "true" -a "$preCommitVerbose" != "false" ]; then
+  printf "Invalid option found: commit-tagger.preCommitVerbose=%s. Allowed values are true (default) and false.\n" "$preCommitVerbose" >&2
+  printf "Please use 'git config commit-tagger.preCommitVerbose true|false' to set a valid configuration.\n" >&2
+  printf "Commit aborted.\n"
+  exit 1
+fi
+
+if [ ! -f "$commandsFile" ]; then
+  printf "Repository's pre-commit commands file: '%s' not found.\n" "$commandsFile" >&2
+  if [ -f "$HOME/.commit-tagger/files/commit-tagger.precommit" ]; then
+    cp "$HOME/.commit-tagger/files/commit-tagger.precommit" "$commandsFile"
+    if [ $? != 0 ]; then
+      printf "There was a problem importing default template.\n"
+      printf "Cannot copy '%s' to '%s'.\n" "$HOME/.commit-tagger/files/commit-tagger.precommit" "$commandsFile" >&2
+      printf "Commit aborted.\n"
+      exit 1
+    fi
+    printf "Imported template from '%s'.\n" "$HOME/.commit-tagger/files/commit-tagger.precommit" >&2
+  else
+    printf "Cannot import default template: file '%s' not found.\n" "$HOME/.commit-tagger/files/commit-tagger.precommit" >&2
+    printf "Please make sure commit-tagger is correctly installed in your system.\n" >&2
+    printf "Commit aborted.\n"
+    exit 1
+  fi
+fi
+
+exec 0< /dev/tty 1> /dev/tty 2>&1
+
+runCommand () {
+  # $1 = command, $2 = [display name]
+
+  if [ "$failed" = "true" ]; then
+    return 1
+  fi
+  if [ -n "$2" ]; then
+    displayName="$2"
+  else
+    displayName="$1"
+  fi
+  printf "Starting '\e[1m%s\e[0m'...\n" "$displayName"
+  if [ "$preCommitVerbose" = "true" ]; then
+    eval "$1"
+  else
+    eval "$1" > /dev/null 2>&1
+  fi
+  if [ $? = 0 ]; then
+    printf "Finished '\e[1m%s\e[0m' successfully.\n" "$displayName"
+    return 0
+  else
+    printf "Command: '\e[1m%s\e[0m' failed.\n" "$displayName"
+    printf "Commit aborted.\n"
+    exit 1
+  fi
+}
+
+stashSave () {
+  local prevStashRef
+  prevStashRef="$(git show-ref --hash stash)"
+  git stash save --keep-index --include-untracked 'commit-tagger: pre-commit files' > /dev/null 2>&1
+  if [ $? != 0 ]; then
+    printf "An error occurred while trying to save the working directory to a new stash and remove unstaged files.\n" >&2
+    printf "Commit aborted.\n"
+    exit 1
+  fi
+  if [ "$(git show-ref --hash stash)" != "$prevStashRef" ]; then
+    stashedChanges="true"
+    printf "Stashed unstaged files.\n\n"
+  fi
+  return 0
+}
+
+stashPop () {
+  if [ "$stashedChanges" != "true" ]; then
+    return 0
+  fi
+  git reset --hard HEAD > /dev/null 2>&1
+  if [ $? != 0 ]; then
+    printf "An error occurred while trying to reset the working directory.\n" >&2
+    printf "Please check 'git stash list' and run 'git reset --hard HEAD' and 'git stash pop --index' yourself.\n" >&2
+    printf "Commit aborted.\n"
+    exit 1
+  fi
+  git stash pop --index > /dev/null 2>&1
+  if [ $? != 0 ]; then
+    printf "An error occurred while trying to restore the working directory from the saved stash.\n" >&2
+    printf "Please check 'git stash list' and run 'git stash pop --index' yourself.\n" >&2
+    printf "Commit aborted.\n"
+    exit 1
+  fi
+  stashedChanges="false"
+  printf "\nRestored working directory from stash.\n"
+  return 0
+}
+
+interrupt () {
+  exec 1> /dev/tty
+  printf "\nCommit aborted.\n"
+  printf "Working directory will be restored from stash.\n"
+  exec 1> /dev/null
+  trap - INT
+  kill -INT $$
+}
+
+stashSave
+trap "stashPop" EXIT
+trap "interrupt" INT
+
+. "$commandsFile"
+
+exit 0
