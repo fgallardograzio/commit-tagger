@@ -29,22 +29,44 @@ abortInstall () {
   fi
 }
 
+installUsage () {
+  printf "Usage: %s [<installation_path>]\n\n" "$0"
+  printf "If <installation_path> is not provided, by default commit-tagger will be installed in '%s/bin'.\n" "$HOME"
+  printf "To install it in a directory whose name starts with a '-', for example: '-foo' use './-foo' instead.\n" "$0"
+  exit 0
+}
+
 test -f "git-commit-tagger"
 abortInstall $? "Cannot find 'git-commit-tagger'. Please make sure your working directory matches the install script's path."
 
 if [ -n "$1" ]; then
+  if printf -- "$1" | grep -q "^-"; then
+    if [ "$1" = "-h" -o "$1" = "--help" ]; then
+      installUsage
+    else
+      printf "Invalid option: '%s'.\n\n" "$1"
+      installUsage
+    fi
+  fi
   installDir="${1%%/}"
 else
   installDir="$HOME/bin"
   installDefault="true"
 fi
 
+if [ "$installDefault" = "true" ]; then
+  printf "commit-tagger will be installed in '$installDir'. "
+  prompt "Do you wish to continue? [yes or no]: "
+  abortInstall $?
+fi
+printf "\n"
+
 if [ ! -d "$installDir" ]; then
   if [ "$installDefault" != "true" ]; then
     prompt "Directory '$installDir' does not exist. Do you wish to create it? [yes or no]: "
     abortInstall $?
   fi
-  printf "Creating directory '%s'.\n" "$installDir"
+  printf "\nCreating directory '%s'.\n" "$installDir"
   mkdir -p "$installDir" > /dev/null 2>&1
   abortInstall $? "There was a problem creating '$installDir'."
 fi
@@ -93,4 +115,9 @@ for file in "files"/*; do
 done
 
 printf "\nInstallation successful.\n"
+
+if ! printf -- "$PATH" | grep -q "^$installDir\|:$installDir"; then
+  printf "\nPlease make sure that the installation directory is in your system PATH.\n"
+fi
+
 exit 0
