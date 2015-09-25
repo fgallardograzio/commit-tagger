@@ -116,8 +116,9 @@ done
 
 printf "\nInstallation successful.\n"
 
-if ! printf -- "$PATH" | grep -q "^$installDir\|:$installDir"; then
-  printf "\nPlease make sure that the installation directory is in your system PATH.\n"
+fullInstallDir="$(cd "$installDir" 2>/dev/null && pwd)"
+if [ -n "$fullInstallDir" ] && ! printf -- "$PATH" | grep -q "^$fullInstallDir\|:$fullInstallDir"; then
+  printf "\nPlease make sure that '%s' is in your system PATH.\n" "$fullInstallDir"
 fi
 
 exit 0
