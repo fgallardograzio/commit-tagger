@@ -2,15 +2,19 @@
 
 ## Description
 
-commit-tagger is a collection of shell scripts and git hooks meant to help developers consistently prefix each commit message with the appropriate tags. These are automatically generated based on the current branch name and the current branch *parents*.
+commit-tagger is a collection of shell scripts and git hooks meant to allow developers to:
+
+1. Consistently prefix every commit message with one or more `[tags]`. These are automatically generated based on the current branch name and the current branch *parents*.
+
+2. Run a series of user-defined commands before actually issuing a commit.
+
+### Tagging commit messages
 
 Popular branch naming conventions suggest prefixing branches with certain strings according to the branch type, such as `feature/`, `hotfix/`, `bugfix/`, etc. For this reason, only what's after a `/` will be taken into account by commit-tagger.
 
 For example, by default, a commit on branch `develop` will have its message automatically prefixed with `[develop]`, and a commit on branch `feature/KEY-1234` will have its message prefixed with `[KEY-1234]`.
 
 This is particularly handy when the branch name contains, for example, a JIRA issue identifier.
-
-Note that a space will be added between the last tag and the message, unless it begins with a `[`. This means that running `git commit -m 'some message'` will result in a commit with the message: `[branch-tag] some message`, and `git commit -m '[another-tag] some message'` will result in `[branch-tag][another-tag] some message`.
 
 Commits that are result of a merge, squash, amend, template or ones that have a reused message won't be affected. Only `git commit`, `git commit -m` and `git commit -F` will trigger this functionality.
 
@@ -23,6 +27,17 @@ When checking out a new<sup>[1](#branch-creation)</sup> branch, a hierarchical r
 These relationships can also be explored and managed using the commands `get-parent`, `set-parent`, `remove-parent`, `show-parents`, `ignore`, `unignore`, `is-ignored` and `show-ignored`.
 
 This relationship model maintains certain correlation with the way that JIRA handles sub-tasks, but it's not limited to only two branches. This feature can be used to automatically include tags from up to 20 *ancestors*.
+
+The following table shows some example commands and the generated commit message. Note that a space will be added between the last tag and the message, unless it begins with a `[`.
+
+| Commands (on branch: task/TAG-123)                                   | Commit message                                 |
+| -------------------------------------------------------------------- | ---------------------------------------------- |
+| git commit -m "Some message"                                         | \[TAG-123\] Some message                       |
+| git commit -m "\[Another-Tag\] With a custom tag"                    | \[TAG-123\]\[Another-Tag\] With a custom tag   |
+| git checkout -b subtask/TAG-456<br>git commit -m "With parent's tag" | \[TAG-123\]\[TAG-456\] With parent's tag       |
+| git commit -m "-No tags in this message"                             | No tags in this message                        |
+
+### Running pre-commit commands
 
 commit-tagger also allows developers to run a series of commands before actually issuing the commit. If any of those commands fail (exit with a status other than 0), the commit will be aborted. Any unstaged changes will be temporarily stashed before running those commands, so that only what's about to be commited is affected and taken into account. Immediately after this step is completed the working directory is restored.
 
