@@ -4,6 +4,7 @@ hooksEnabled="$(git config --get commit-tagger.hooksEnabled || printf "true")"
 preCommitEnabled="$(git config --get commit-tagger.preCommitEnabled || printf "true")"
 preCommitVerbose="$(git config --get commit-tagger.preCommitVerbose || printf "true")"
 commandsFile="$(git rev-parse --git-dir)/commit-tagger.precommit"
+MERGE_HEAD="$(git rev-parse --git-dir)/MERGE_HEAD"
 
 if [ "$hooksEnabled" = "false" ]; then
   exit 0
@@ -21,6 +22,10 @@ elif [ "$preCommitEnabled" != "true" ]; then
   printf "Please use 'git config commit-tagger.preCommitEnabled true|false' to set a valid configuration.\n" >&2
   printf "Commit aborted.\n"
   exit 1
+fi
+
+if [ -e "$MERGE_HEAD" ]; then
+  exit 0
 fi
 
 if [ "$preCommitVerbose" != "true" -a "$preCommitVerbose" != "false" ]; then

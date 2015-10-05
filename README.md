@@ -39,7 +39,7 @@ The following table shows some example commands and the generated commit message
 
 ### Running pre-commit commands
 
-commit-tagger also allows developers to run a series of commands before actually issuing the commit. If any of those commands fail (exit with a status other than 0), the commit will be aborted. Any unstaged changes will be temporarily stashed before running those commands, so that only what's about to be commited is affected and taken into account. Immediately after this step is completed the working directory is restored.
+commit-tagger also allows developers to run a series of commands before actually issuing a commit. If any of those commands fail (exit with a status other than 0), the commit will be aborted. Any unstaged changes will be temporarily stashed before running those commands, so that only what's about to be commited is affected and taken into account. Immediately after this step is completed the working directory is restored.
 
 This can be used to check file names and contents, checking code for syntax errors, code style, running unit tests, and everything a developer needs to make sure what's being commited is perfect.
 
@@ -48,6 +48,8 @@ This hook's execution can be prevented by using git commit's option `--no-verify
 Please be careful not to interrupt this process by pressing `Ctrl+C` **more than once**<sup>[2](#interrupting-the-pre-commit-hook)</sup>.
 
 To configure custom pre-commit tasks use the command `set-precommit`. This will open the current repository's pre-commit hook's configuration file in git's core.editor (`git config core.editor`) or vi if undefined.
+
+Note that pre-commit commands won't be run during a merge.
 
 ## Installation
 
